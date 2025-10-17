@@ -1,6 +1,6 @@
 # Wellnest
 
-Mental wellness platform backend API built with FastAPI.
+Our AI software keeps families connected to aging loved ones by learning routines, detecting changes, and sending alerts—privacy-first, no cameras, just smarter, safer independent living.
 
 ## Project Structure
 
