@@ -12,7 +12,7 @@ class EventIngestResponse(BaseModel):
     status: str = "success"
     message: str
     event_id: str
-    timestamp: datetime
+    timestamp: str  # Changed from datetime to str to match Event model
 
 class BatchIngestResponse(BaseModel):
     """Response after batch event ingestion"""

@@ -7,7 +7,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URL=mongodb://mongo:27017
+      - MONGODB_URL=mongodb+srv://shwethanarayanan1095_db_user:v474guUVluCMOx8Y@cluster0.btmrgvr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - MONGODB_DATABASE=wellnest
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333

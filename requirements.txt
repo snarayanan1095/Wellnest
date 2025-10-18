@@ -25,3 +25,6 @@ httpx>=0.26.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
 pyyaml>=6.0.1  # For simulator config
+
+# Simulator dependencies
+requests>=2.31.0
