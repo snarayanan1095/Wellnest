@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wellnest-config
+  namespace: default
+data:
+  # Application settings
+  APP_NAME: "wellnest"
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
+
+  # MongoDB settings (non-sensitive)
+  MONGODB_DATABASE: "wellnest"
+
+  # NVIDIA NIM API settings (cloud-hosted, no GPU needed)
+  # NIM_API_BASE_URL: "https://integrate.api.nvidia.com/v1"
+  # NIM_LLM_MODEL: "meta/llama-3.1-8b-instruct"
+  # NIM_EMBEDDING_MODEL: "nvidia/nv-embedqa-e5-v5"
+
+  # Redis settings (if needed later)
+  # REDIS_URL: "redis://redis-service:6379"
+
+  # Qdrant settings (if needed later)
+  # QDRANT_URL: "http://qdrant-service:6333"
+  # VECTOR_DB_TYPE: "qdrant"

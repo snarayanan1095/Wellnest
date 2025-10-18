@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wellnest-backend
+  namespace: default
+  labels:
+    app: wellnest
+    component: backend
+spec:
+  type: LoadBalancer  # Use LoadBalancer for external access, or ClusterIP for internal only
+  selector:
+    app: wellnest
+    component: backend
+  ports:
+  - port: 80          # External port
+    targetPort: 8000  # Container port
+    protocol: TCP
+    name: http
+  sessionAffinity: None

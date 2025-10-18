@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wellnest-backend
+  namespace: default
+  labels:
+    app: wellnest
+    component: backend
+spec:
+  replicas: 1  # Start with 1, scale up as needed
+  selector:
+    matchLabels:
+      app: wellnest
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: wellnest
+        component: backend
+    spec:
+      containers:
+      - name: wellnest-api
+        image: YOUR_ECR_REGISTRY/wellnest-backend:latest  # Replace with your ECR image URL
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: wellnest-config
+        - secretRef:
+            name: wellnest-secrets
+
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        # Resource limits (adjust based on your needs)
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+      # Restart policy
+      restartPolicy: Always
