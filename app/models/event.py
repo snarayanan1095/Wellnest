@@ -3,7 +3,8 @@ from typing import Optional
 
 class Event(BaseModel):
     """Model for sensor events - all fields are strings"""
-    id: Optional[str] = Field(None, alias="_id")
+    household_id: Optional[str] = Field(None, alias="_id", description="Household identifier")
+    event_id: str = Field(..., description="Unique event identifier")
     timestamp: str = Field(..., description="Event timestamp as string")
     sensor_id: str = Field(..., description="Sensor identifier")
     sensor_type: str = Field(..., description="Type of sensor")
@@ -15,6 +16,7 @@ class Event(BaseModel):
 
 class EventCreate(BaseModel):
     """Model for creating a new event from sensor client"""
+    household_id: str
     timestamp: str
     sensor_id: str
     sensor_type: str

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.mongo import MongoDB
+from app.db.kafka_client import KafkaClient
 import threading
 # from app.db.redis_client import RedisClient
 # from app.db.vector_db import VectorDB
@@ -116,6 +117,13 @@ async def startup_event():
         print(f"✗ Error connecting to MongoDB: {e}")
         raise
 
+    # Initialize Kafka
+    try:
+        await KafkaClient.connect()
+    except Exception as e:
+        print(f"⚠ Kafka not available: {e}")
+        print("⚠ Running without Kafka (events won't be published to message queue)")
+
     # Start the simulator in a background thread
     simulator_thread = threading.Thread(target=run_simulator_in_background, daemon=True)
     simulator_thread.start()
@@ -159,6 +167,12 @@ async def shutdown_event():
         await MongoDB.close()
     except Exception as e:
         print(f"✗ Error closing MongoDB: {e}")
+
+    # Close Kafka producer
+    try:
+        KafkaClient.close()
+    except Exception as e:
+        print(f"✗ Error closing Kafka: {e}")
 
     # Close other databases when needed
     # try:
