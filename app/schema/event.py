@@ -10,6 +10,7 @@ class Event(BaseModel):
     sensor_type: str = Field(..., description="Type of sensor")
     location: str = Field(..., description="Sensor location")
     value: str = Field(..., description="Sensor value as string")
+    resident: Optional[str] = Field(None, description="Associated resident identifier")
 
     class Config:
         populate_by_name = True
@@ -22,6 +23,7 @@ class EventCreate(BaseModel):
     sensor_type: str
     location: str
     value: str
+    resident: str
 
 class EventResponse(Event):
     """Model for event API responses"""

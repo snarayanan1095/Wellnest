@@ -98,7 +98,7 @@ def run_simulator_in_background():
     print("="*60 + "\n")
 
     # Run the continuous simulation
-    run_continuous_simulation("http://localhost:8000/api/events", delay_seconds=5)
+    run_continuous_simulation("http://localhost:8000/api/events", check_interval=10)
 
 
 @app.on_event("startup")

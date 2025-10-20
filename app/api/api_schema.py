@@ -30,7 +30,7 @@ class EventListResponse(BaseModel):
     user_id: Optional[str] = None
 
 # Import EventResponse to resolve forward reference
-from app.models.event import EventResponse
+from app.schema.event import EventResponse
 
 # Update forward references
 EventListResponse.model_rebuild()

@@ -5,7 +5,7 @@ Handles incoming events from sensor simulators
 import hashlib
 from fastapi import HTTPException, status
 
-from app.models.event import Event, EventCreate
+from app.schema.event import Event, EventCreate
 from app.api.api_schema import EventIngestResponse
 from app.db.mongo import MongoDB
 from app.db.kafka_client import KafkaClient
@@ -23,22 +23,23 @@ async def ingest_event(event_data: EventCreate):
 
         # Create event object with event_id
         event = Event(
-            household_id=event_data.household_id,
             event_id=event_id,
+            household_id=event_data.household_id,
             timestamp=event_data.timestamp,
             sensor_id=event_data.sensor_id,
             sensor_type=event_data.sensor_type,
             location=event_data.location,
-            value=event_data.value
+            value=event_data.value,
+            resident=event_data.resident
         )
 
         # Prepare document for MongoDB
-        event_dict = event.model_dump(by_alias=True, exclude_none=True)
+        event_dict = event.model_dump(by_alias=False, exclude_none=True)
 
-        # MongoDB document structure: _id = household_id, event_id = unique event identifier
-        # Store household_id as the primary key for efficient querying
+        # MongoDB document structure: _id = event_id (unique identifier)
+        # Keep household_id as a separate field for querying
         event_dict['_id'] = event_id  # Use event_id as MongoDB _id for uniqueness
-        event_dict['event_id'] = event_id  # Also keep event_id field for reference
+        #event_dict['household_id'] = event_data.household_id  # Explicitly preserve household_id
 
         # Insert into MongoDB events collection
         inserted_id = await MongoDB.write("events", event_dict)
