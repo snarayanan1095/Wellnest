@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.mongo import MongoDB
+from app.db.kafka_client import KafkaClient
+from app.scheduler import start_scheduler, shutdown_scheduler
 import threading
 # from app.db.redis_client import RedisClient
 # from app.db.vector_db import VectorDB
@@ -97,7 +99,7 @@ def run_simulator_in_background():
     print("="*60 + "\n")
 
     # Run the continuous simulation
-    run_continuous_simulation("http://localhost:8000/api/events", delay_seconds=5)
+    run_continuous_simulation("http://localhost:8000/api/events", check_interval=10)
 
 
 @app.on_event("startup")
@@ -116,10 +118,23 @@ async def startup_event():
         print(f"✗ Error connecting to MongoDB: {e}")
         raise
 
+    # Initialize Kafka
+    try:
+        await KafkaClient.connect()
+    except Exception as e:
+        print(f"⚠ Kafka not available: {e}")
+        print("⚠ Running without Kafka (events won't be published to message queue)")
+
     # Start the simulator in a background thread
     simulator_thread = threading.Thread(target=run_simulator_in_background, daemon=True)
     simulator_thread.start()
     print("✓ Sensor simulator scheduled to start")
+
+    # Start the routine learner scheduler
+    try:
+        start_scheduler()
+    except Exception as e:
+        print(f"⚠ Error starting routine learner scheduler: {e}")
 
     # Initialize other databases when needed
     # try:
@@ -154,11 +169,23 @@ async def shutdown_event():
 
     # The simulator thread will automatically stop since it's a daemon thread
 
+    # Stop the routine learner scheduler
+    try:
+        shutdown_scheduler()
+    except Exception as e:
+        print(f"✗ Error stopping routine learner scheduler: {e}")
+
     # Close MongoDB connection
     try:
         await MongoDB.close()
     except Exception as e:
         print(f"✗ Error closing MongoDB: {e}")
+
+    # Close Kafka producer
+    try:
+        KafkaClient.close()
+    except Exception as e:
+        print(f"✗ Error closing Kafka: {e}")
 
     # Close other databases when needed
     # try:

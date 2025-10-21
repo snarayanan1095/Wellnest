@@ -53,8 +53,16 @@ uvicorn app.main:app --reload
 ### Docker Development
 
 1. Start all services:
+
+```docker-compose up -d kafka zookeeper
+```
+Verify if kafka is up and running
+```
+docker-compose exec kafka kafka-broker-api-versions --bootstrap-server localhost:9092
+```
+Start application
 ```bash
-docker-compose up -d
+docker-compose up -d --build --force-recreate
 ```
 
 2. View logs:
@@ -66,6 +74,9 @@ docker-compose logs -f api
 ```bash
 docker-compose down
 ```
+
+### Interjected tests
+1. If you want to test the routine learner cronjob, 
 
 ## API Documentation
 
@@ -94,6 +105,9 @@ pytest --cov=app tests/
 - **APScheduler**: Background job scheduling
 - **Motor**: Async MongoDB driver
 - **Pydantic**: Data validation
+
+## Note
+- For the sake of the hackathon, we have some commented code and commented notions. These are for future use cases if we take the route of actually making this a product. **#FUTURE** usage throughout the codebase signifies additional features if we take the above route. 
 
 ## License
 

@@ -5,6 +5,7 @@ Central router for all API endpoints
 from fastapi import APIRouter, status
 from app.api import event_ingestion_service
 from app.api.api_schema import EventIngestResponse
+from app.scheduler.routine_learner import batch_routine_learner_and_baseline as run_routine_learner
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -20,6 +21,16 @@ api_router.add_api_route(
     summary="Ingest sensor event",
     description="Ingest a single event from sensor simulator (all string fields)"
 )
+
+# Manual trigger endpoint for routine learner (for testing)
+@api_router.post("/routines/trigger", tags=["routines"], summary="Manually trigger routine learning")
+async def trigger_routine_learner():
+    """
+    Manually trigger the routine learning process.
+    Useful for testing without waiting for the scheduled job.
+    """
+    result = await run_routine_learner()
+    return result if result else {"message": "Routine learning completed", "status": "success"}
 
 # Future routers can be added here:
 # api_router.add_api_route(path="/events/batch", endpoint=..., methods=["POST"])
