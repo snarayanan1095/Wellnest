@@ -84,6 +84,33 @@ class MongoDB:
         return documents
 
     @classmethod
+    async def aggregate(cls, collection_name: str, pipeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Run an aggregation pipeline on a collection
+
+        Args:
+            collection_name: Name of the collection
+            pipeline: Aggregation pipeline stages
+
+        Returns:
+            List[Dict]: List of aggregation results
+        """
+        if cls.client is None:
+            raise RuntimeError("MongoDB client is not connected. Call connect() first.")
+
+        db = cls.client[cls._db_name]
+        collection = db[collection_name]
+        cursor = collection.aggregate(pipeline)
+        results = await cursor.to_list(length=None)
+
+        # Convert ObjectId to string for JSON serialization
+        for doc in results:
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+
+        return results
+
+    @classmethod
     async def close(cls):
         """Close MongoDB connection"""
         if cls.client:

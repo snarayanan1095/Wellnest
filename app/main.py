@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.mongo import MongoDB
 from app.db.kafka_client import KafkaClient
+from app.scheduler import start_scheduler, shutdown_scheduler
 import threading
 # from app.db.redis_client import RedisClient
 # from app.db.vector_db import VectorDB
@@ -129,6 +130,12 @@ async def startup_event():
     simulator_thread.start()
     print("✓ Sensor simulator scheduled to start")
 
+    # Start the routine learner scheduler
+    try:
+        start_scheduler()
+    except Exception as e:
+        print(f"⚠ Error starting routine learner scheduler: {e}")
+
     # Initialize other databases when needed
     # try:
     #     # Initialize Redis (optional)
@@ -161,6 +168,12 @@ async def shutdown_event():
     print("="*60)
 
     # The simulator thread will automatically stop since it's a daemon thread
+
+    # Stop the routine learner scheduler
+    try:
+        shutdown_scheduler()
+    except Exception as e:
+        print(f"✗ Error stopping routine learner scheduler: {e}")
 
     # Close MongoDB connection
     try:
