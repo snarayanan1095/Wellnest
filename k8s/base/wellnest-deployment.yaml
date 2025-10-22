@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wellnest-api
+  namespace: wellnest
+  labels:
+    app: wellnest-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wellnest-api
+  template:
+    metadata:
+      labels:
+        app: wellnest-api
+    spec:
+      containers:
+        - name: wellnest-api
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/wellnest:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            # MongoDB Configuration (from secrets)
+            - name: MONGODB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: MONGODB_USERNAME
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: MONGODB_PASSWORD
+            - name: MONGODB_CLUSTER
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: MONGODB_CLUSTER
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: MONGODB_URL
+
+            # Configuration from ConfigMap
+            - name: MONGODB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: MONGODB_DATABASE
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_TOPIC_EVENTS
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: KAFKA_TOPIC_EVENTS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: LOG_LEVEL
+            - name: USE_JSON_LOGGING
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: USE_JSON_LOGGING
+            - name: API_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: API_HOST
+            - name: API_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: wellnest-config
+                  key: API_PORT
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wellnest-api-service
+  namespace: wellnest
+  labels:
+    app: wellnest-api
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: wellnest-api
