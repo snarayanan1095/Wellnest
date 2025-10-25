@@ -55,7 +55,7 @@ class MongoDB:
         return str(result.inserted_id)
 
     @classmethod
-    async def read(cls, collection_name: str, query: Dict[str, Any] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    async def read(cls, collection_name: str, query: Dict[str, Any] = None, limit: int = 100, sort: List[tuple] = None) -> List[Dict[str, Any]]:
         """
         Read documents from a collection
 
@@ -63,6 +63,7 @@ class MongoDB:
             collection_name: Name of the collection
             query: Query filter (default: {} - returns all documents)
             limit: Maximum number of documents to return
+            sort: List of tuples (field, direction) for sorting, e.g., [("timestamp", 1)]
 
         Returns:
             List[Dict]: List of documents
@@ -73,8 +74,17 @@ class MongoDB:
         query = query or {}
         db = cls.client[cls._db_name]
         collection = db[collection_name]
-        cursor = collection.find(query).limit(limit)
-        documents = await cursor.to_list(length=limit)
+        cursor = collection.find(query)
+
+        # Apply sorting if provided
+        if sort:
+            cursor = cursor.sort(sort)
+
+        # Apply limit if not None/0
+        if limit:
+            cursor = cursor.limit(limit)
+
+        documents = await cursor.to_list(length=limit if limit else None)
 
         # Convert ObjectId to string for JSON serialization
         for doc in documents:
@@ -82,6 +92,28 @@ class MongoDB:
                 doc['_id'] = str(doc['_id'])
 
         return documents
+
+    @classmethod
+    async def distinct(cls, collection_name: str, field: str, query: Dict[str, Any] = None) -> List[Any]:
+        """
+        Get distinct values for a field in a collection
+
+        Args:
+            collection_name: Name of the collection
+            field: Field name to get distinct values from
+            query: Query filter (optional)
+
+        Returns:
+            List: List of distinct values
+        """
+        if cls.client is None:
+            raise RuntimeError("MongoDB client is not connected. Call connect() first.")
+
+        query = query or {}
+        db = cls.client[cls._db_name]
+        collection = db[collection_name]
+        distinct_values = await collection.distinct(field, query)
+        return distinct_values
 
     @classmethod
     async def aggregate(cls, collection_name: str, pipeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

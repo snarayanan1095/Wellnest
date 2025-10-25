@@ -9,8 +9,8 @@ from app.schema.event import Event, EventCreate
 from app.api.api_schema import EventIngestResponse
 from app.db.mongo import MongoDB
 from app.db.kafka_client import KafkaClient
+from app.services.anomaly_detector import detector
 
-# Pure endpoint functions without decorators
 async def ingest_event(event_data: EventCreate):
     """
     Ingest a single event from sensor client
@@ -46,7 +46,10 @@ async def ingest_event(event_data: EventCreate):
         print(f"✓ Event inserted into MongoDB - ID: {inserted_id}, Sensor: {event.sensor_id}")
 
         """ Using kafka for real time processing to make sure:
-        1. 
+        1. Event ingestion is decoupled from anomaly detection
+        2. System can scale better with more households and events
+        3. Events from different households can be processed in parallel without blocking
+        4. Events are in the right order for each household
         """
         try:
             # Use household_id as key for Kafka partitioning to keep all household events together
@@ -59,13 +62,18 @@ async def ingest_event(event_data: EventCreate):
             # Log error but don't fail the request if Kafka is unavailable
             print(f"⚠ Failed to publish to Kafka: {kafka_error}")
 
+        # Update anomaly detector state with the new event
+        try:
+            await detector.update_state_on_event(event_dict)
+        except Exception as anomaly_error:
+            print(f"⚠️ Anomaly detector failed for event ID {event_id}: {anomaly_error}")
+
         return EventIngestResponse(
             status="success",
             message=f"Event from household {event.household_id}, sensor {event.sensor_id} ingested successfully",
             event_id=event_id,
             timestamp=event.timestamp
         )
-
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

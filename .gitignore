@@ -218,3 +218,8 @@ chroma_db/
 # OS
 .DS_Store
 Thumbs.db
+
+#Local testing
+temp_trigger_routine_learner.py
+test_event_ingestion.py
+test_websocket_client.py

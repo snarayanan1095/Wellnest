@@ -6,9 +6,13 @@ from fastapi import APIRouter, status
 from app.api import event_ingestion_service
 from app.api.api_schema import EventIngestResponse
 from app.scheduler.routine_learner import batch_routine_learner_and_baseline as run_routine_learner
+from app.api import websocket
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
+
+# Include WebSocket router for real-time alerts
+api_router.include_router(websocket.router, tags=["websockets"])
 
 # Register event ingestion endpoint directly using endpoint= parameter
 api_router.add_api_route(
