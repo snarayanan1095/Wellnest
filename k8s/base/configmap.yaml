@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wellnest-config
+  namespace: wellnest
+data:
+  # Kafka Configuration
+  KAFKA_TOPIC_EVENTS: "wellnest-events"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+
+  # MongoDB Database
+  MONGODB_DATABASE: "wellnest"
+
+  # Vector Database (optional)
+  VECTOR_DB_TYPE: "qdrant"
+  QDRANT_URL: "http://qdrant-service:6333"
+
+  # Redis (optional)
+  REDIS_URL: "redis://redis-service:6379"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+  USE_JSON_LOGGING: "true"
+
+  # API Configuration
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"

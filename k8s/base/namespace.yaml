@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wellnest
+  labels:
+    name: wellnest
+    app: wellnest
