@@ -64,6 +64,10 @@ async def ingest_event(event_data: EventCreate):
 
         # Update anomaly detector state with the new event
         try:
+            """FUTURE: 
+            1. consider making this async and non-blocking
+            2. state is currently a in-memory cache. Consider using Redis or similar for distributed state management
+            """
             await detector.update_state_on_event(event_dict)
         except Exception as anomaly_error:
             print(f"⚠️ Anomaly detector failed for event ID {event_id}: {anomaly_error}")
