@@ -117,8 +117,9 @@ class TestRoutineExtraction:
 class TestSummaryGeneration:
     """Test summary text generation"""
 
-    def test_generate_summary_complete_data(self, daily_routine_sample):
-        """Test summary with complete routine data"""
+    @patch.dict('os.environ', {}, clear=True)
+    def test_generate_summary_complete_data_no_llm(self, daily_routine_sample):
+        """Test summary with complete routine data (template fallback)"""
         summary = generate_summary(daily_routine_sample)
 
         assert "Woke up at 06:30" in summary
@@ -127,6 +128,7 @@ class TestSummaryGeneration:
         assert "went to bed at 22:00" in summary
         assert "45 sensor events" in summary
 
+    @patch.dict('os.environ', {}, clear=True)
     def test_generate_summary_partial_data(self):
         """Test summary with partial routine data"""
         partial_routine = {
@@ -141,6 +143,7 @@ class TestSummaryGeneration:
         assert "kitchen activity at 07:30" in summary
         assert "20 sensor events" in summary
 
+    @patch.dict('os.environ', {}, clear=True)
     def test_generate_summary_no_data(self):
         """Test summary with no significant data"""
         empty_routine = {
@@ -151,6 +154,7 @@ class TestSummaryGeneration:
 
         assert "No significant activity detected" in summary
 
+    @patch.dict('os.environ', {}, clear=True)
     def test_generate_summary_activity_fallback(self):
         """Test summary uses activity_start when wake_up_time missing"""
         routine = {
@@ -163,6 +167,70 @@ class TestSummaryGeneration:
 
         assert "First activity at 08:00" in summary
         assert "last activity at 20:00" in summary
+
+    @patch.dict('os.environ', {"NIM_API_KEY": "test_key"})
+    @patch('app.scheduler.routine_learner.NIMLLMService.get_llama3_summary')
+    def test_generate_summary_with_llm_success(self, mock_llm_service, daily_routine_sample):
+        """Test that generate_summary calls LLM service when API key is available"""
+        mock_llm_service.return_value = "The household maintained a regular morning routine starting at 6:30 AM. Evening activities concluded normally with bedtime at 10:00 PM."
+
+        summary = generate_summary(daily_routine_sample)
+
+        # Verify LLM service was called
+        mock_llm_service.assert_called_once_with(daily_routine_sample)
+
+        # Verify we got the LLM summary
+        assert summary == "The household maintained a regular morning routine starting at 6:30 AM. Evening activities concluded normally with bedtime at 10:00 PM."
+        assert "Woke up at" not in summary  # Should not be template-based
+
+    @patch.dict('os.environ', {"NIM_API_KEY": "test_key"})
+    @patch('app.scheduler.routine_learner.NIMLLMService.get_llama3_summary')
+    def test_generate_summary_llm_fallback_on_error(self, mock_llm_service, daily_routine_sample):
+        """Test that generate_summary falls back to template when LLM fails"""
+        mock_llm_service.side_effect = Exception("API Error")
+
+        summary = generate_summary(daily_routine_sample)
+
+        # Verify LLM service was attempted
+        mock_llm_service.assert_called_once_with(daily_routine_sample)
+
+        # Verify we got the template fallback
+        assert "Woke up at 06:30" in summary
+        assert "kitchen activity at 07:00" in summary
+
+    @patch.dict('os.environ', {"NIM_API_KEY": "test_key"})
+    @patch('app.scheduler.routine_learner.NIMLLMService.get_llama3_summary')
+    def test_generate_summary_llm_with_api_key_error(self, mock_llm_service):
+        """Test fallback when NIM_API_KEY is invalid"""
+        mock_llm_service.side_effect = KeyError("NIM_API_KEY not found")
+
+        routine = {
+            "wake_up_time": "07:00",
+            "bed_time": "22:00",
+            "total_events": 50
+        }
+
+        summary = generate_summary(routine)
+
+        # Should fallback to template
+        assert "Woke up at 07:00" in summary
+        assert "went to bed at 22:00" in summary
+
+    @patch.dict('os.environ', {"NIM_API_KEY": "test_key"})
+    @patch('app.scheduler.routine_learner.NIMLLMService.get_llama3_summary')
+    def test_generate_summary_llm_returns_empty_string(self, mock_llm_service):
+        """Test fallback when LLM returns empty string"""
+        mock_llm_service.return_value = ""
+
+        routine = {
+            "wake_up_time": "07:00",
+            "total_events": 50
+        }
+
+        summary = generate_summary(routine)
+
+        # Empty string is valid, but should be returned
+        assert summary == ""
 
 
 class TestProfileSaving:

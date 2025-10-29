@@ -14,9 +14,9 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: wellnest-backend
+  ECR_REPOSITORY: wellnest
   EKS_CLUSTER_NAME: wellnest-cluster
-  DEPLOYMENT_NAME: wellnest-backend
+  DEPLOYMENT_NAME: wellnest
 
 jobs:
   deploy:
