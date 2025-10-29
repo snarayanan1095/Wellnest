@@ -16,7 +16,8 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: wellnest
   EKS_CLUSTER_NAME: wellnest-cluster
-  DEPLOYMENT_NAME: wellnest
+  DEPLOYMENT_NAME: wellnest-api
+  NAMESPACE: wellnest
 
 jobs:
   deploy:
@@ -71,15 +72,16 @@ jobs:
       run: |
         # Update deployment image
         kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
-          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -n ${{ env.NAMESPACE }}
 
         # Wait for rollout to complete
-        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=300s
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} --timeout=300s
 
     - name: Verify deployment
       run: |
-        kubectl get services ${{ env.DEPLOYMENT_NAME }}
-        kubectl get pods -l app=wellnest
+        kubectl get services -n ${{ env.NAMESPACE }}
+        kubectl get pods -l app=wellnest -n ${{ env.NAMESPACE }}
 
     - name: Notify deployment status
       if: always()
