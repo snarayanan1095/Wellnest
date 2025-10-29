@@ -222,3 +222,5 @@ Thumbs.db
 #Local testing
 temp_trigger_routine_learner.py
 test_websocket_client.py
+restore-dashboard-components.sh
+dashboard/DASHBOARD_AUDIT.md

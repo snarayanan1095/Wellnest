@@ -26,6 +26,17 @@ services:
       - kafka
     restart: unless-stopped
 
+  # Dashboard (React frontend)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   # MongoDB
   mongo:
     image: mongo:7.0

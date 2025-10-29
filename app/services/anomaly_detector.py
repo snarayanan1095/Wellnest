@@ -50,6 +50,7 @@ class AnomalyDetector:
     async def update_state_on_event(self, event: dict):
         """Update household daily state; only run anomaly check for critical events."""
         household_id = event["household_id"]
+        print(f"📊 Updating state for {household_id}: {event['sensor_type']} at {event['location']}")
 
         # Ensure lock exists for this household
         if household_id not in self.state_locks:
