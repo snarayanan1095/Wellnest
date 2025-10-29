@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'simulator/**'
+      - 'dashboard/**'
       - 'requirements.txt'
       - 'Dockerfile'
       - 'k8s/**'
@@ -15,8 +16,10 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: wellnest
+  ECR_DASHBOARD_REPOSITORY: wellnest-dashboard
   EKS_CLUSTER_NAME: wellnest-cluster
-  DEPLOYMENT_NAME: wellnest
+  DEPLOYMENT_NAME: wellnest-api
+  DASHBOARD_DEPLOYMENT_NAME: wellnest-dashboard
 
 jobs:
   deploy:
@@ -38,13 +41,13 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build, tag, and push API image to Amazon ECR
       id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build Docker image
+        # Build API Docker image
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
@@ -54,34 +57,74 @@ jobs:
 
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Update kubeconfig
-      run: |
-        aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-
-    - name: Deploy to EKS
+    - name: Build, tag, and push Dashboard image to Amazon ECR
+      id: build-dashboard-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Update deployment image
+        # Build Dashboard Docker image
+        docker build -t $ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:$IMAGE_TAG ./dashboard
+        docker tag $ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:latest
+
+        # Push both tags
+        docker push $ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:latest
+
+        echo "image=$ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+    - name: Deploy API to EKS
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Update API deployment image
         kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
           wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -n wellnest \
           --record
 
         # Wait for rollout to complete
-        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=300s
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n wellnest --timeout=300s
+
+    - name: Deploy Dashboard to EKS
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Update Dashboard deployment image
+        kubectl set image deployment/${{ env.DASHBOARD_DEPLOYMENT_NAME }} \
+          wellnest-dashboard=$ECR_REGISTRY/$ECR_DASHBOARD_REPOSITORY:$IMAGE_TAG \
+          -n wellnest \
+          --record
+
+        # Wait for rollout to complete
+        kubectl rollout status deployment/${{ env.DASHBOARD_DEPLOYMENT_NAME }} -n wellnest --timeout=300s
 
     - name: Verify deployment
       run: |
-        kubectl get services ${{ env.DEPLOYMENT_NAME }}
-        kubectl get pods -l app=wellnest
+        kubectl get services -n wellnest
+        kubectl get pods -n wellnest
+
+    - name: Get LoadBalancer URLs
+      run: |
+        echo "=== API Service ==="
+        kubectl get svc wellnest-api-service -n wellnest
+        echo ""
+        echo "=== Dashboard Service ==="
+        kubectl get svc wellnest-dashboard-service -n wellnest
 
     - name: Notify deployment status
       if: always()
       run: |
         if [ ${{ job.status }} == 'success' ]; then
           echo "✅ Deployment successful!"
-          echo "Image: ${{ steps.build-image.outputs.image }}"
+          echo "API Image: ${{ steps.build-image.outputs.image }}"
+          echo "Dashboard Image: ${{ steps.build-dashboard-image.outputs.image }}"
         else
           echo "❌ Deployment failed!"
         fi

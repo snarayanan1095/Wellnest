@@ -7,6 +7,9 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - MONGODB_USERNAME=shwethanarayanan1095_db_user
+      - MONGODB_PASSWORD=v474guUVluCMOx8Y
+      - MONGODB_CLUSTER=cluster0.btmrgvr.mongodb.net
       - MONGODB_URL=mongodb+srv://shwethanarayanan1095_db_user:v474guUVluCMOx8Y@cluster0.btmrgvr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - MONGODB_DATABASE=wellnest
       - REDIS_URL=redis://redis:6379
@@ -25,6 +28,19 @@ services:
       - qdrant
       - kafka
     restart: unless-stopped
+
+  # Dashboard (React frontend)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:8000
 
   # MongoDB
   mongo:

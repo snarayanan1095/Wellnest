@@ -44,23 +44,61 @@ spec:
                 secretKeyRef:
                   name: wellnest-secrets
                   key: MONGODB_URL
-
-            # Configuration from ConfigMap
             - name: MONGODB_DATABASE
               valueFrom:
-                configMapKeyRef:
-                  name: wellnest-config
+                secretKeyRef:
+                  name: wellnest-secrets
                   key: MONGODB_DATABASE
+
+            # Redis Configuration (from secrets)
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: REDIS_URL
+
+            # Vector Database Configuration (from secrets)
+            - name: VECTOR_DB_TYPE
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: VECTOR_DB_TYPE
+            - name: QDRANT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: QDRANT_URL
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: QDRANT_API_KEY
+
+            # NIM Configuration (from secrets)
+            - name: NIM_MODEL_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: NIM_MODEL_NAME
+            - name: NIM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wellnest-secrets
+                  key: NIM_API_KEY
+
+            # Kafka Configuration (from secrets)
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
-                configMapKeyRef:
-                  name: wellnest-config
+                secretKeyRef:
+                  name: wellnest-secrets
                   key: KAFKA_BOOTSTRAP_SERVERS
             - name: KAFKA_TOPIC_EVENTS
               valueFrom:
-                configMapKeyRef:
-                  name: wellnest-config
+                secretKeyRef:
+                  name: wellnest-secrets
                   key: KAFKA_TOPIC_EVENTS
+
+            # Configuration from ConfigMap (non-sensitive)
             - name: LOG_LEVEL
               valueFrom:
                 configMapKeyRef:

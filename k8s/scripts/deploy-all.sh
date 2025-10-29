@@ -47,27 +47,43 @@ kubectl apply -f base/kafka-statefulset.yaml
 echo "Waiting for Kafka to be ready..."
 kubectl wait --for=condition=ready pod -l app=kafka -n wellnest --timeout=300s
 
-# Step 6: Update deployment with ECR image
-echo -e "${BLUE}📝 Updating deployment manifest with ECR image...${NC}"
+# Step 6: Update API deployment with ECR image
+echo -e "${BLUE}📝 Updating API deployment manifest with ECR image...${NC}"
 sed "s/\${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID}/g; s/\${AWS_REGION}/${AWS_REGION}/g" \
     base/wellnest-deployment.yaml | kubectl apply -f -
 
-# Step 7: Wait for deployment
+# Step 7: Update Dashboard deployment with ECR image
+echo -e "${BLUE}🎨 Deploying Dashboard...${NC}"
+sed "s/\${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID}/g; s/\${AWS_REGION}/${AWS_REGION}/g" \
+    base/dashboard-deployment.yaml | kubectl apply -f -
+
+# Step 8: Wait for API deployment
 echo -e "${BLUE}⏳ Waiting for Wellnest API to be ready...${NC}"
 kubectl wait --for=condition=available deployment/wellnest-api -n wellnest --timeout=300s
 
-# Step 8: Get service URL
+# Step 9: Wait for Dashboard deployment
+echo -e "${BLUE}⏳ Waiting for Dashboard to be ready...${NC}"
+kubectl wait --for=condition=available deployment/wellnest-dashboard -n wellnest --timeout=300s
+
+# Step 10: Get service URLs
 echo -e "${GREEN}✅ Deployment complete!${NC}"
 echo ""
 echo -e "${YELLOW}Getting service information...${NC}"
+echo ""
+echo "=== API Service ==="
 kubectl get svc wellnest-api-service -n wellnest
+echo ""
+echo "=== Dashboard Service ==="
+kubectl get svc wellnest-dashboard-service -n wellnest
 
 echo ""
-echo "To get the external URL, run:"
-echo "  kubectl get svc wellnest-api-service -n wellnest -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
+echo "To get the external URLs, run:"
+echo "  API: kubectl get svc wellnest-api-service -n wellnest -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
+echo "  Dashboard: kubectl get svc wellnest-dashboard-service -n wellnest -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
 echo ""
 echo "To view logs:"
-echo "  kubectl logs -f -l app=wellnest-api -n wellnest"
+echo "  API: kubectl logs -f -l app=wellnest-api -n wellnest"
+echo "  Dashboard: kubectl logs -f -l app=wellnest-dashboard -n wellnest"
 echo ""
 echo "To check pod status:"
 echo "  kubectl get pods -n wellnest"
