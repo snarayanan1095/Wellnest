@@ -54,6 +54,12 @@ jobs:
 
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+
     - name: Update kubeconfig
       run: |
         aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
@@ -65,8 +71,7 @@ jobs:
       run: |
         # Update deployment image
         kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
-          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-          --record
+          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
         # Wait for rollout to complete
         kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=300s
