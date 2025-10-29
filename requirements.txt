@@ -16,6 +16,9 @@ kafka-python>=2.0.2
 # chromadb>=0.4.22  # Uncomment if using Chroma
 qdrant-client>=1.7.0  # Uncomment if using Qdrant
 
+# Embeddings
+langchain-nvidia-ai-endpoints>=0.3.5
+
 # Scheduling
 apscheduler>=3.10.4
 

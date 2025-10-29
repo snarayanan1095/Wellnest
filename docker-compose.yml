@@ -10,10 +10,13 @@ services:
       - MONGODB_URL=mongodb+srv://shwethanarayanan1095_db_user:v474guUVluCMOx8Y@cluster0.btmrgvr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - MONGODB_DATABASE=wellnest
       - REDIS_URL=redis://redis:6379
-      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_URL=https://e449595f-1fe4-4d83-a42b-c510c7fad9f8.us-east-1-1.aws.cloud.qdrant.io:6333
+      - QDRANT_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.JDXQrogS4zwkkDNjHgZx-6WrgSUO55EY1DaVjyTz_Rc
       - VECTOR_DB_TYPE=qdrant
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - KAFKA_TOPIC_EVENTS=wellnest-events
+      - NIM_MODEL_NAME=nvidia/nv-embedqa-e5-v5
+      - NIM_API_KEY=${NIM_API_KEY}
     volumes:
       - ./app:/app/app
     depends_on:

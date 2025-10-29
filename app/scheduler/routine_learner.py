@@ -1,7 +1,11 @@
 from app.db.mongo import MongoDB
+from app.db.qdrant_client import QdrantClient
+from app.services.nim_embedding_service import NIMEmbeddingService
+from app.services.nim_llm_service import NIMLLMService
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import statistics
+import uuid
 
 
 # Global scheduler instance
@@ -76,8 +80,18 @@ def extract_routine(events):
     }
 
 def generate_summary(profile_dict):
-    """Generate a human-readable summary of the routine"""
-    #FUTURE: Use NIM LLM for better summaries
+    """
+    Generate a human-readable summary of the routine using NIM LLM.
+    Falls back to template-based summary if LLM call fails.
+    """
+    # Try to use NIM LLM for better summaries
+    try:
+        llm_summary = NIMLLMService.get_llama3_summary(profile_dict)
+        return llm_summary
+    except Exception as e:
+        print(f"⚠ Failed to generate LLM summary, falling back to template: {e}")
+
+    # Fallback to template-based summary if LLM is not available
     parts = []
 
     if profile_dict.get("wake_up_time"):
@@ -278,6 +292,33 @@ async def aggregate_baselines(n_days=7, baseline_collection="routine_baselines",
 
         await MongoDB.write(baseline_collection, baseline_doc)
         print(f"✓ Saved baseline profile for {h_id} covering {start_str} to {end_str}")
+
+        # Generate embedding for the baseline routine
+        try:
+            embed_text = NIMEmbeddingService.format_baseline_routine_for_embedding(baseline_doc)
+            embedding = NIMEmbeddingService.embed_query(embed_text)
+            print(f"✓ Generated embedding for {h_id} baseline (dimension: {len(embedding)})")
+
+            # Generate UUID for Qdrant (Qdrant requires UUID or unsigned integer)
+            point_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, baseline_doc["_id"]))
+
+            # Store embedding in Qdrant vector database
+            await QdrantClient.insert_vectors(
+                collection_name="routine_baselines",
+                vectors=[embedding],
+                payloads=[{
+                    "household_id": h_id,
+                    "baseline_id": baseline_doc["_id"],  # Store original MongoDB ID in payload
+                    "baseline_period_start": start_str,
+                    "baseline_period_end": end_str,
+                    "computed_at": baseline_doc["computed_at"],
+                    "embed_text": embed_text[:500]  # Store first 500 chars
+                }],
+                ids=[point_uuid]  # Use UUID instead of string ID
+            )
+            print(f"✓ Stored embedding in Qdrant for {h_id}")
+        except Exception as e:
+            print(f"⚠ Failed to generate/store embedding for {h_id}: {e}")
 
 async def batch_routine_learner_and_baseline():
     await batch_routine_learner_daily()

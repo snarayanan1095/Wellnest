@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.mongo import MongoDB
 from app.db.kafka_client import KafkaClient
+from app.db.qdrant_client import QdrantClient
+from app.services.nim_embedding_service import NIMEmbeddingService
 from app.scheduler import start_scheduler, shutdown_scheduler
 import threading
 # from app.db.redis_client import RedisClient
@@ -125,6 +127,28 @@ async def startup_event():
         print(f"⚠ Kafka not available: {e}")
         print("⚠ Running without Kafka (events won't be published to message queue)")
 
+    # Initialize Qdrant
+    try:
+        await QdrantClient.connect()
+        # Create routine_baselines collection if it doesn't exist
+        # Note: You need to know the embedding dimension. nvidia/nv-embedqa-e5-v5 uses 1024 dimensions
+        from qdrant_client.models import Distance
+        await QdrantClient.create_collection(
+            collection_name="routine_baselines",
+            vector_size=1024,  # nvidia/nv-embedqa-e5-v5 embedding size
+            distance=Distance.COSINE
+        )
+    except Exception as e:
+        print(f"⚠ Qdrant not available: {e}")
+        print("⚠ Running without Qdrant (vector search features will be disabled)")
+
+    # Initialize NIM Embedding Service
+    try:
+        NIMEmbeddingService.initialize()
+    except Exception as e:
+        print(f"⚠ NIM Embedding Service not available: {e}")
+        print("⚠ Running without NIM embeddings (semantic search features will be disabled)")
+
     # Start the simulator in a background thread
     simulator_thread = threading.Thread(target=run_simulator_in_background, daemon=True)
     simulator_thread.start()
@@ -186,6 +210,12 @@ async def shutdown_event():
         KafkaClient.close()
     except Exception as e:
         print(f"✗ Error closing Kafka: {e}")
+
+    # Close Qdrant connection
+    try:
+        await QdrantClient.close()
+    except Exception as e:
+        print(f"✗ Error closing Qdrant: {e}")
 
     # Close other databases when needed
     # try:
