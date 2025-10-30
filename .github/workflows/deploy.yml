@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'simulator/**'
+      - 'dashboard/**'
       - 'requirements.txt'
       - 'Dockerfile'
       - 'k8s/**'
@@ -14,9 +15,11 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: wellnest
+  ECR_REPOSITORY_API: wellnest
+  ECR_REPOSITORY_DASHBOARD: wellnest-dashboard
   EKS_CLUSTER_NAME: wellnest-cluster
-  DEPLOYMENT_NAME: wellnest-api
+  DEPLOYMENT_NAME_API: wellnest-api
+  DEPLOYMENT_NAME_DASHBOARD: wellnest-dashboard
   NAMESPACE: wellnest
 
 jobs:
@@ -39,21 +42,37 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
+    - name: Build, tag, and push API image to Amazon ECR
+      id: build-api-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build Docker image
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        # Build API Docker image
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
 
         # Push both tags
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:latest
 
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Build, tag, and push Dashboard image to Amazon ECR
+      id: build-dashboard-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Build Dashboard Docker image
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:$IMAGE_TAG ./dashboard
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:latest
+
+        # Push both tags
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:latest
+
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
     - name: Install kubectl
       run: |
@@ -65,30 +84,50 @@ jobs:
       run: |
         aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
-    - name: Deploy to EKS
+    - name: Deploy API to EKS
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Update deployment image
-        kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
-          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+        # Update API deployment image
+        kubectl set image deployment/${{ env.DEPLOYMENT_NAME_API }} \
+          wellnest-api=$ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG \
           -n ${{ env.NAMESPACE }}
 
         # Wait for rollout to complete
-        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} --timeout=300s
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME_API }} -n ${{ env.NAMESPACE }} --timeout=300s
+
+    - name: Deploy Dashboard to EKS
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Update Dashboard deployment image
+        kubectl set image deployment/${{ env.DEPLOYMENT_NAME_DASHBOARD }} \
+          wellnest-dashboard=$ECR_REGISTRY/$ECR_REPOSITORY_DASHBOARD:$IMAGE_TAG \
+          -n ${{ env.NAMESPACE }}
+
+        # Wait for rollout to complete
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME_DASHBOARD }} -n ${{ env.NAMESPACE }} --timeout=300s
 
     - name: Verify deployment
       run: |
+        echo "=== Services ==="
         kubectl get services -n ${{ env.NAMESPACE }}
-        kubectl get pods -l app=wellnest -n ${{ env.NAMESPACE }}
+        echo ""
+        echo "=== API Pods ==="
+        kubectl get pods -l app=wellnest-api -n ${{ env.NAMESPACE }}
+        echo ""
+        echo "=== Dashboard Pods ==="
+        kubectl get pods -l app=wellnest-dashboard -n ${{ env.NAMESPACE }}
 
     - name: Notify deployment status
       if: always()
       run: |
         if [ ${{ job.status }} == 'success' ]; then
           echo "✅ Deployment successful!"
-          echo "Image: ${{ steps.build-image.outputs.image }}"
+          echo "API Image: ${{ steps.build-api-image.outputs.image }}"
+          echo "Dashboard Image: ${{ steps.build-dashboard-image.outputs.image }}"
         else
           echo "❌ Deployment failed!"
         fi
