@@ -22,6 +22,8 @@ spec:
           ports:
             - containerPort: 80
               name: http
+            - containerPort: 443
+              name: https
           resources:
             requests:
               memory: "128Mi"
@@ -58,5 +60,9 @@ spec:
       targetPort: 80
       protocol: TCP
       name: http
+    - port: 443
+      targetPort: 443
+      protocol: TCP
+      name: https
   selector:
     app: wellnest-dashboard
