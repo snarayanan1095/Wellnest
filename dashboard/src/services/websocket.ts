@@ -51,13 +51,13 @@ class WebSocketService {
 
     // Determine WebSocket URL based on environment
     let wsUrl: string;
-    if (window.location.port === '3000') {
+    if (window.location.port === '5173') {
+      // Development - connect directly to backend
+      wsUrl = `ws://localhost:8000/api/ws/events/${householdId}`;
+    } else {
       // Production/Docker - use relative URL through nginx
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}/api/ws/events/${householdId}`;
-    } else {
-      // Development - connect directly to backend
-      wsUrl = `ws://localhost:8000/api/ws/events/${householdId}`;
     }
     console.log(`Connecting to WebSocket: ${wsUrl}`);
 
