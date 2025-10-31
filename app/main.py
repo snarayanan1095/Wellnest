@@ -102,8 +102,8 @@ def run_simulator_in_background():
     print("🚀 Starting automatic sensor simulation...")
     print("="*60 + "\n")
 
-    # Run the continuous simulation
-    run_continuous_simulation("http://localhost:8000/api/events", check_interval=10)
+    # Run the continuous simulation with anomaly mode enabled for household_003
+    run_continuous_simulation("http://localhost:8000/api/events", check_interval=10, anomaly_for_003=True)
 
 
 @app.on_event("startup")

@@ -21,16 +21,20 @@ class ConnectionManager:
         self.active_connections[household_id].append(websocket)
 
         # Send initial state of all residents' locations for this household
-        if household_id in self.resident_locations:
-            initial_state = {
-                "type": "initial_state",
-                "residents": self.resident_locations[household_id]
-            }
-            try:
-                await websocket.send_json(initial_state)
-                print(f"✓ Sent initial state to household {household_id}: {self.resident_locations[household_id]}")
-            except Exception as e:
-                print(f"❌ Failed to send initial state: {e}")
+        # Send empty dict if no cached locations yet
+        residents_data = self.resident_locations.get(household_id, {})
+        initial_state = {
+            "type": "initial_state",
+            "residents": residents_data
+        }
+        try:
+            await websocket.send_json(initial_state)
+            if residents_data:
+                print(f"✓ Sent initial state to household {household_id}: {residents_data}")
+            else:
+                print(f"✓ Sent empty initial state to household {household_id} (no cached data yet)")
+        except Exception as e:
+            print(f"❌ Failed to send initial state: {e}")
 
     def add_connection(self, websocket, household_id: str):
         """Add an already-accepted WebSocket connection"""
