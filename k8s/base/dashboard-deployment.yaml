@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: wellnest-dashboard
-          image: 450574282439.dkr.ecr.us-east-1.amazonaws.com/wellnest-dashboard:latest
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/wellnest-dashboard:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
