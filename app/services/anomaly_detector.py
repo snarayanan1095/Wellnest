@@ -62,6 +62,9 @@ class AnomalyDetector:
             self._update_state(state, event)
             self.household_state[household_id] = state
 
+        # Mark household as active when we receive any event
+        await self.update_household_status(household_id, "active")
+
         # Immediate anomaly detection only for critical events
         if event["sensor_type"] in self.CRITICAL_EVENTS:
             await self.check_anomalies(household_id, last_event=event, force=True)
@@ -192,6 +195,8 @@ class AnomalyDetector:
                     "household_id": household_id,
                     "timestamp": current_time.isoformat()
                 })
+                # Update household status to inactive
+                await self.update_household_status(household_id, "inactive")
         # Excessive bathroom visits
         bathroom_baseline = baseline.get("bathroom_visits", {})
         if bathroom_baseline.get("max_daily"):
@@ -286,5 +291,29 @@ class AnomalyDetector:
     def reset_daily_state(self):
         self.household_state = {}
         print("♻️ Household state cache reset")
+
+    async def update_household_status(self, household_id: str, status: str):
+        """
+        Update the household status in the database
+
+        Args:
+            household_id: The household ID
+            status: 'active' or 'inactive'
+        """
+        try:
+            modified_count = await MongoDB.update(
+                "households",
+                query={"_id": household_id},
+                update={
+                    "$set": {
+                        "status": status,
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                }
+            )
+            if modified_count > 0:
+                print(f"✓ Updated household {household_id} status to '{status}'")
+        except Exception as e:
+            print(f"✗ Failed to update household {household_id} status: {e}")
 
 detector = AnomalyDetector()

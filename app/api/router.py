@@ -8,6 +8,8 @@ from app.api.api_schema import EventIngestResponse
 from app.scheduler.routine_learner import batch_routine_learner_and_baseline as run_routine_learner
 from app.api import websocket
 from app.api import semantic_search
+from app.api import households
+from app.api import dashboard_endpoints
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -17,6 +19,12 @@ api_router.include_router(websocket.router, tags=["websockets"])
 
 # Include Semantic Search router
 api_router.include_router(semantic_search.router, tags=["semantic-search"])
+
+# Include Households router
+api_router.include_router(households.router)
+
+# Include Dashboard endpoints router
+api_router.include_router(dashboard_endpoints.router)
 
 # Register event ingestion endpoint directly using endpoint= parameter
 api_router.add_api_route(

@@ -143,6 +143,48 @@ class MongoDB:
         return results
 
     @classmethod
+    async def update(cls, collection_name: str, query: Dict[str, Any], update: Dict[str, Any]) -> int:
+        """
+        Update documents in a collection
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter to match documents
+            update: Update operations to apply (should include $set, $inc, etc.)
+
+        Returns:
+            int: Number of documents modified
+        """
+        if cls.client is None:
+            raise RuntimeError("MongoDB client is not connected. Call connect() first.")
+
+        db = cls.client[cls._db_name]
+        collection = db[collection_name]
+        result = await collection.update_many(query, update)
+        return result.modified_count
+
+    @classmethod
+    async def count(cls, collection_name: str, query: Dict[str, Any] = None) -> int:
+        """
+        Count documents in a collection matching a query
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter (default: {} - counts all documents)
+
+        Returns:
+            int: Number of documents matching the query
+        """
+        if cls.client is None:
+            raise RuntimeError("MongoDB client is not connected. Call connect() first.")
+
+        query = query or {}
+        db = cls.client[cls._db_name]
+        collection = db[collection_name]
+        count = await collection.count_documents(query)
+        return count
+
+    @classmethod
     async def close(cls):
         """Close MongoDB connection"""
         if cls.client:

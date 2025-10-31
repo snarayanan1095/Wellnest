@@ -1,37 +1,34 @@
-# Multi-stage build for Wellnest Dashboard
+# Multi-stage build for React dashboard
 
-# Stage 1: Build the React application
-FROM node:18-alpine AS builder
+# Stage 1: Build the React app
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json ./
 
-# Install ALL dependencies (including devDependencies needed for build)
-RUN npm install
+
+RUN rm -rf node_modules package-lock.json && \
+    npm install
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the app
 RUN npm run build
 
-# Stage 2: Serve with nginx
-FROM nginx:1.25-alpine
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
 
-# Copy built assets from builder stage
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy built app from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:80/ || exit 1
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
