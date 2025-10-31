@@ -1,4 +1,45 @@
 {
+  "household_003": {
+    "name": "Davis Family",
+    "events": [
+      {
+        "sensor_id": "motion_bedroom1",
+        "location": "bedroom1",
+        "sensor_type": "motion",
+        "resident": "grandma"
+      },
+      {
+        "sensor_id": "motion_bedroom2",
+        "location": "bedroom2",
+        "sensor_type": "motion",
+        "resident": "grandma"
+      },
+      {
+        "sensor_id": "motion_kitchen",
+        "location": "kitchen",
+        "sensor_type": "motion",
+        "resident": "grandma"
+      },
+      {
+        "sensor_id": "motion_bathroom1",
+        "location": "bathroom1",
+        "sensor_type": "motion",
+        "resident": "grandma"
+      },
+      {
+        "sensor_id": "bed_bedroom1",
+        "location": "bedroom1",
+        "sensor_type": "bed_presence",
+        "resident": "grandma"
+      },
+      {
+        "sensor_id": "bed_bedroom2",
+        "location": "bedroom2",
+        "sensor_type": "bed_presence",
+        "resident": "grandma"
+      }
+    ]
+  },
   "household_001": {
     "name": "Smith Family",
     "events": [
@@ -78,47 +119,6 @@
         "location": "entrance",
         "sensor_type": "door",
         "resident": "grandpa"
-      }
-    ]
-  },
-  "household_003": {
-    "name": "Davis Family",
-    "events": [
-      {
-        "sensor_id": "motion_bedroom1",
-        "location": "bedroom1",
-        "sensor_type": "motion",
-        "resident": "grandma"
-      },
-      {
-        "sensor_id": "motion_bedroom2",
-        "location": "bedroom2",
-        "sensor_type": "motion",
-        "resident": "grandma"
-      },
-      {
-        "sensor_id": "motion_kitchen",
-        "location": "kitchen",
-        "sensor_type": "motion",
-        "resident": "grandma"
-      },
-      {
-        "sensor_id": "motion_bathroom1",
-        "location": "bathroom1",
-        "sensor_type": "motion",
-        "resident": "grandma"
-      },
-      {
-        "sensor_id": "bed_bedroom1",
-        "location": "bedroom1",
-        "sensor_type": "bed_presence",
-        "resident": "grandma"
-      },
-      {
-        "sensor_id": "bed_bedroom2",
-        "location": "bedroom2",
-        "sensor_type": "bed_presence",
-        "resident": "grandma"
       }
     ]
   }

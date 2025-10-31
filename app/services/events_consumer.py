@@ -56,7 +56,11 @@ class EventsConsumer:
                                     location = event.get("location")
 
                                     if resident and location:
-                                        manager.update_resident_location(household_id, resident, location)
+                                        await manager.update_resident_location(household_id, resident, location)
+
+                                    # Add timestamp to event before forwarding
+                                    from datetime import datetime
+                                    event["last_active"] = datetime.utcnow().isoformat()
 
                                     # Forward entire event to WebSocket clients for this household
                                     await manager.send_alert(household_id, event)

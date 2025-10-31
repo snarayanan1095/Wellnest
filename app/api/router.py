@@ -10,6 +10,7 @@ from app.api import websocket
 from app.api import semantic_search
 from app.api import households
 from app.api import dashboard_endpoints
+from app.api import alerts
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -25,6 +26,9 @@ api_router.include_router(households.router)
 
 # Include Dashboard endpoints router
 api_router.include_router(dashboard_endpoints.router)
+
+# Include Alerts router
+api_router.include_router(alerts.router, tags=["alerts"])
 
 # Register event ingestion endpoint directly using endpoint= parameter
 api_router.add_api_route(

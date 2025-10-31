@@ -8,6 +8,7 @@ import {
   type Household
 } from './services/api';
 import { websocketService } from './services/websocket';
+import { AlertService, type Alert, type AlertCounts } from './services/alerts';
 
 function App() {
   // State for household selection
@@ -22,8 +23,13 @@ function App() {
   const [score, setScore] = useState<number>(0);
   const [scoreChange, setScoreChange] = useState<number>(0);
 
-  // State for live locations (one per resident)
+  // State for live locations (one per resident) and their last active timestamps
   const [liveLocations, setLiveLocations] = useState<Record<string, string>>({});
+  const [lastActiveTimestamps, setLastActiveTimestamps] = useState<Record<string, string>>({});
+
+  // State for alerts
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alertCounts, setAlertCounts] = useState<AlertCounts>({ high: 0, medium: 0, low: 0, total: 0 });
 
   // Loading and error states
   const [loading, setLoading] = useState<boolean>(true);
@@ -50,8 +56,9 @@ function App() {
   // Connect to WebSocket when household changes
   useEffect(() => {
     if (selectedHouseholdId) {
-      // Clear previous locations when switching households
+      // Clear previous locations and timestamps when switching households
       setLiveLocations({});
+      setLastActiveTimestamps({});
 
       // Connect to WebSocket for this household
       websocketService.connect(selectedHouseholdId);
@@ -61,6 +68,10 @@ function App() {
         // Handle initial state message
         if (event.type === 'initial_state' && event.residents) {
           setLiveLocations(event.residents);
+          // Also set timestamps if provided
+          if (event.timestamps) {
+            setLastActiveTimestamps(event.timestamps);
+          }
         }
         // Handle regular location updates
         else if (event.resident && event.location) {
@@ -68,6 +79,40 @@ function App() {
           setLiveLocations(prev => ({
             ...prev,
             [residentName]: event.location
+          }));
+          // Update timestamp if provided
+          if (event.last_active) {
+            setLastActiveTimestamps(prev => ({
+              ...prev,
+              [residentName]: event.last_active
+            }));
+          }
+        }
+        // Handle real-time alerts
+        else if (event.alert_id && event.severity) {
+          console.log('📨 Received real-time alert:', event);
+
+          // Add the new alert to the beginning of the list
+          const newAlert: Alert = {
+            alert_id: event.alert_id,
+            household_id: event.household_id || selectedHouseholdId,
+            type: event.type,
+            severity: event.severity,
+            title: event.title,
+            message: event.message,
+            timestamp: event.timestamp,
+            acknowledged: false,
+            created_at: event.timestamp
+          };
+
+          // Keep only the latest alert
+          setAlerts([newAlert]); // Keep only the latest alert
+
+          // Update alert counts
+          setAlertCounts(prev => ({
+            ...prev,
+            [event.severity]: prev[event.severity as keyof AlertCounts] + 1,
+            total: prev.total + 1
           }));
         }
       });
@@ -120,6 +165,19 @@ function App() {
       };
       setStatus(statusMap[household.status] || household.status.toUpperCase());
 
+      // Fetch alerts for this household - only the latest one
+      try {
+        const [alertData, alertCountData] = await Promise.all([
+          AlertService.getAlerts(householdId, { limit: 1, hours: 24, acknowledged: false }),
+          AlertService.getAlertCounts(householdId, 24)
+        ]);
+        setAlerts(alertData.slice(0, 1)); // Keep only the latest alert
+        setAlertCounts(alertCountData);
+      } catch (err) {
+        console.error('Failed to load alerts:', err);
+        // Don't fail the whole load if alerts fail
+      }
+
       // Fetch weekly trends for score
       try {
         const trends = await fetchWeeklyTrends(householdId);
@@ -159,6 +217,56 @@ function App() {
     return location
       .replace(/_/g, ' ')
       .replace(/\b\w/g, char => char.toUpperCase());
+  };
+
+  const formatLastActive = (timestamp: string | undefined): { status: string; detail: string } => {
+    if (!timestamp) return { status: 'Unknown', detail: 'No data' };
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    // Format time as HH:MM AM/PM
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    if (diffMins < 1) {
+      return { status: 'Active now', detail: 'Currently active' };
+    }
+
+    if (diffMins < 5) {
+      return { status: 'Recently active', detail: `Last seen at ${timeStr}` };
+    }
+
+    if (diffMins < 60) {
+      return {
+        status: `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`,
+        detail: `Last seen at ${timeStr}`
+      };
+    }
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) {
+      return {
+        status: `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`,
+        detail: `Last seen at ${timeStr}`
+      };
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    const dateStr = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+
+    return {
+      status: `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`,
+      detail: `Last seen ${dateStr} at ${timeStr}`
+    };
   };
 
   return (
@@ -298,14 +406,35 @@ function App() {
                             {resident.name} is in {formatLocation(currentLocation)}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {currentLocation !== 'Unknown' ? 'Live' : 'Waiting for data...'}
+                            {currentLocation !== 'Unknown'
+                              ? formatLastActive(lastActiveTimestamps[resident.name]).detail
+                              : 'Waiting for data...'
+                            }
                           </p>
                         </div>
                       </div>
                       {currentLocation !== 'Unknown' && (
                         <div className="flex items-center">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
-                          <span className="text-xs text-green-600">Active</span>
+                          {formatLastActive(lastActiveTimestamps[resident.name]).status === 'Active now' ? (
+                            <>
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                              <span className="text-xs text-green-600">Active</span>
+                            </>
+                          ) : formatLastActive(lastActiveTimestamps[resident.name]).status === 'Recently active' ? (
+                            <>
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                              <span className="text-xs text-yellow-600">
+                                {formatLastActive(lastActiveTimestamps[resident.name]).status}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                              <span className="text-xs text-gray-400">
+                                {formatLastActive(lastActiveTimestamps[resident.name]).status}
+                              </span>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -339,87 +468,60 @@ function App() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Alert Center</h2>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                3 Active
-              </span>
+              {alertCounts.total > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  {alertCounts.total} Active
+                </span>
+              )}
             </div>
 
             <div className="space-y-3">
-              {/* Mock alerts for now - will be replaced with real data */}
-              {/* Critical Alert */}
-              <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-red-800">
-                      Prolonged Inactivity Detected
-                    </p>
-                    <p className="mt-1 text-xs text-red-700">
-                      No motion detected in Bedroom 1 for 4 hours
-                    </p>
-                    <p className="mt-2 text-xs text-red-600">
-                      2 minutes ago • Grandma
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* Real alerts from backend - showing only latest */}
+              {alerts.length > 0 ? (
+                alerts.slice(0, 1).map((alert) => {
+                  const colors = AlertService.getSeverityColor(alert.severity);
+                  const timeAgo = AlertService.formatTimeAgo(alert.timestamp);
 
-              {/* Warning Alert */}
-              <div className="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded-r-lg">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-yellow-800">
-                      Unusual Pattern Detected
-                    </p>
-                    <p className="mt-1 text-xs text-yellow-700">
-                      Multiple bathroom visits in short period
-                    </p>
-                    <p className="mt-2 text-xs text-yellow-600">
-                      15 minutes ago • Grandpa
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Info Alert */}
-              <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-blue-800">
-                      Late Wake Up
-                    </p>
-                    <p className="mt-1 text-xs text-blue-700">
-                      First activity detected at 10:30 AM
-                    </p>
-                    <p className="mt-2 text-xs text-blue-600">
-                      1 hour ago • Grandmom
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* No alerts state (hidden when there are alerts) */}
-              {false && (
+                  return (
+                    <div key={alert.alert_id} className={`border-l-4 ${colors.border} ${colors.bg} p-4 rounded-r-lg`}>
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className={`h-5 w-5 ${colors.icon}`} viewBox="0 0 20 20" fill="currentColor">
+                            {alert.severity === 'high' ? (
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            ) : alert.severity === 'medium' ? (
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            ) : (
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            )}
+                          </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className={`text-sm font-medium ${colors.text}`}>
+                            {alert.title}
+                          </p>
+                          <p className={`mt-1 text-xs ${colors.text} opacity-90`}>
+                            {alert.message}
+                          </p>
+                          <p className={`mt-2 text-xs ${colors.text} opacity-75`}>
+                            {timeAgo}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : selectedHouseholdId ? (
                 <div className="text-center py-8 text-gray-500">
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="mt-2 text-sm">No active alerts</p>
                   <p className="text-xs text-gray-400 mt-1">All systems normal</p>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  Select a household to view alerts
                 </div>
               )}
             </div>

@@ -1,12 +1,14 @@
 # app/services/ws_manager.py
 from typing import Dict, List, Optional
 import json
+from datetime import datetime
+import asyncio
+from app.db.mongo import MongoDB
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List] = {}
-        # In-memory cache: household_id -> {resident_name -> location}
-        self.resident_locations: Dict[str, Dict[str, str]] = {}
+        # MongoDB will be used for persistent cache instead of in-memory
 
     async def connect(self, websocket, household_id: str):
         await websocket.accept()
@@ -23,21 +25,49 @@ class ConnectionManager:
         self.active_connections[household_id].append(websocket)
         print(f"📝 Added connection to list for {household_id}, total: {len(self.active_connections[household_id])}")
 
-        # Send initial state of all residents' locations for this household
-        # Send empty dict if no cached locations yet
-        residents_data = self.resident_locations.get(household_id, {})
-        print(f"🔍 Cache check for {household_id}: {residents_data}")
+        # Fetch cached resident locations from MongoDB
+        residents_data = {}
+        timestamps = {}
+
+        try:
+            # Get all resident locations for this household from MongoDB
+            locations = await MongoDB.read(
+                "resident_locations",
+                query={"household_id": household_id},
+                sort=[("last_active", -1)]  # Most recent first
+            )
+
+            # Group by resident (in case of duplicates, use most recent)
+            seen_residents = set()
+            for loc in locations:
+                resident = loc.get("resident")
+                if resident and resident not in seen_residents:
+                    residents_data[resident] = loc.get("location", "Unknown")
+                    timestamps[resident] = loc.get("last_active")
+                    seen_residents.add(resident)
+
+            print(f"🔍 MongoDB cache check for {household_id}: {len(residents_data)} residents")
+
+        except Exception as e:
+            print(f"⚠️ Error fetching cached locations from MongoDB: {e}")
+            # Fall back to empty state if MongoDB query fails
+            pass
 
         initial_state = {
             "type": "initial_state",
-            "residents": residents_data
+            "residents": residents_data,
+            "timestamps": timestamps
         }
 
         try:
             print(f"📨 Attempting to send initial state to {household_id}...")
             await websocket.send_json(initial_state)
             if residents_data:
-                print(f"✓ Sent initial state to household {household_id}: {residents_data}")
+                print(f"✓ Sent initial state to household {household_id}: {len(residents_data)} residents with timestamps")
+                # Debug: Show what we're actually sending
+                for resident, location in residents_data.items():
+                    ts = timestamps.get(resident, "no timestamp")
+                    print(f"  - {resident}: {location} (ts: {ts})")
             else:
                 print(f"✓ Sent empty initial state to household {household_id} (no cached data yet)")
         except Exception as e:
@@ -51,12 +81,36 @@ class ConnectionManager:
             self.active_connections[household_id] = []
         self.active_connections[household_id].append(websocket)
 
-    def update_resident_location(self, household_id: str, resident: str, location: str):
-        """Update the cached location for a resident"""
-        if household_id not in self.resident_locations:
-            self.resident_locations[household_id] = {}
-        self.resident_locations[household_id][resident] = location
-        print(f"📍 Cache updated: {household_id}/{resident} -> {location}")
+    async def update_resident_location(self, household_id: str, resident: str, location: str):
+        """Update the cached location and timestamp for a resident in MongoDB"""
+        try:
+            timestamp = datetime.utcnow()
+
+            # Upsert the resident location document
+            document = {
+                "_id": f"{household_id}_{resident}",  # Unique ID per household-resident combo
+                "household_id": household_id,
+                "resident": resident,
+                "location": location,
+                "last_active": timestamp.isoformat(),
+                "updated_at": timestamp.isoformat()
+            }
+
+            # First try to update, if no document exists, insert it
+            result = await MongoDB.update(
+                "resident_locations",
+                {"_id": document["_id"]},
+                {"$set": document}
+            )
+
+            # If no document was modified, insert a new one
+            if result == 0:
+                await MongoDB.write("resident_locations", document)
+
+            print(f"📍 MongoDB cache updated: {household_id}/{resident} -> {location} at {timestamp.strftime('%H:%M:%S')}")
+
+        except Exception as e:
+            print(f"❌ Failed to update MongoDB cache: {e}")
 
     def disconnect(self, websocket, household_id: str):
         if household_id in self.active_connections:
