@@ -1,9 +1,12 @@
 # app/services/ws_manager.py
-from typing import Dict, List
+from typing import Dict, List, Optional
+import json
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List] = {}
+        # In-memory cache: household_id -> {resident_name -> location}
+        self.resident_locations: Dict[str, Dict[str, str]] = {}
 
     async def connect(self, websocket, household_id: str):
         await websocket.accept()
@@ -11,17 +14,62 @@ class ConnectionManager:
             self.active_connections[household_id] = []
         self.active_connections[household_id].append(websocket)
 
+    async def add_connection_with_state(self, websocket, household_id: str):
+        """Add an already-accepted WebSocket connection and send initial state"""
+        if household_id not in self.active_connections:
+            self.active_connections[household_id] = []
+        self.active_connections[household_id].append(websocket)
+
+        # Send initial state of all residents' locations for this household
+        if household_id in self.resident_locations:
+            initial_state = {
+                "type": "initial_state",
+                "residents": self.resident_locations[household_id]
+            }
+            try:
+                await websocket.send_json(initial_state)
+                print(f"✓ Sent initial state to household {household_id}: {self.resident_locations[household_id]}")
+            except Exception as e:
+                print(f"❌ Failed to send initial state: {e}")
+
+    def add_connection(self, websocket, household_id: str):
+        """Add an already-accepted WebSocket connection"""
+        if household_id not in self.active_connections:
+            self.active_connections[household_id] = []
+        self.active_connections[household_id].append(websocket)
+
+    def update_resident_location(self, household_id: str, resident: str, location: str):
+        """Update the cached location for a resident"""
+        if household_id not in self.resident_locations:
+            self.resident_locations[household_id] = {}
+        self.resident_locations[household_id][resident] = location
+        print(f"📍 Cache updated: {household_id}/{resident} -> {location}")
+
     def disconnect(self, websocket, household_id: str):
         if household_id in self.active_connections:
-            self.active_connections[household_id].remove(websocket)
+            try:
+                self.active_connections[household_id].remove(websocket)
+                # Clean up empty connection lists immediately
+                if not self.active_connections[household_id]:
+                    del self.active_connections[household_id]
+                    print(f"🧹 Cleaned up connection list for household {household_id}")
+            except ValueError:
+                # Connection wasn't in the list
+                pass
 
     async def send_alert(self, household_id: str, message: dict):
-        if household_id not in self.active_connections:
-            print(f"⚠️ No active WebSocket connections for household {household_id}")
-            return
+        # Check if there are any active connections for this household
+        if household_id not in self.active_connections or not self.active_connections[household_id]:
+            # Only print warning occasionally to avoid log spam
+            if not hasattr(self, '_warning_count'):
+                self._warning_count = {}
+            if household_id not in self._warning_count:
+                self._warning_count[household_id] = 0
+            self._warning_count[household_id] += 1
 
-        if not self.active_connections[household_id]:
-            print(f"⚠️ Empty connection list for household {household_id}")
+            # Only warn every 10th attempt to reduce log noise
+            if self._warning_count[household_id] % 10 == 1:
+                print(f"⚠️ No active WebSocket connections for household {household_id} (suppressing further warnings)")
             return
 
         dead_connections = []

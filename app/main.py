@@ -6,7 +6,9 @@ from app.db.kafka_client import KafkaClient
 from app.db.qdrant_client import QdrantClient
 from app.services.nim_embedding_service import NIMEmbeddingService
 from app.scheduler import start_scheduler, shutdown_scheduler
+from app.services.events_consumer import start_events_consumer
 import threading
+import asyncio
 # from app.db.redis_client import RedisClient
 # from app.db.vector_db import VectorDB
 
@@ -159,6 +161,13 @@ async def startup_event():
         start_scheduler()
     except Exception as e:
         print(f"⚠ Error starting routine learner scheduler: {e}")
+
+    # Start the events consumer for WebSocket streaming
+    try:
+        asyncio.create_task(start_events_consumer())
+        print("✓ Events consumer started for WebSocket streaming")
+    except Exception as e:
+        print(f"⚠ Error starting events consumer: {e}")
 
     # Initialize other databases when needed
     # try:

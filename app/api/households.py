@@ -35,7 +35,7 @@ class HouseholdListResponse(BaseModel):
     name: str
     residents: List[Resident]
     status: str  # 'active' or 'inactive'
-    last_update: datetime
+    last_update: Optional[datetime] = None
 
     class Config:
         populate_by_name = True
@@ -78,6 +78,3 @@ async def get_household(household_id: str):
         raise HTTPException(status_code=404, detail=f"Household {household_id} not found")
 
     return households[0]
-
-
-# Removed score calculation - using simple active/inactive status instead

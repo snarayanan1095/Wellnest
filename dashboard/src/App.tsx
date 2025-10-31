@@ -7,6 +7,7 @@ import {
   type HouseholdListItem,
   type Household
 } from './services/api';
+import { websocketService } from './services/websocket';
 
 function App() {
   // State for household selection
@@ -21,6 +22,9 @@ function App() {
   const [score, setScore] = useState<number>(0);
   const [scoreChange, setScoreChange] = useState<number>(0);
 
+  // State for live locations (one per resident)
+  const [liveLocations, setLiveLocations] = useState<Record<string, string>>({});
+
   // Loading and error states
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,12 +38,45 @@ function App() {
   useEffect(() => {
     if (selectedHouseholdId) {
       loadHouseholdData(selectedHouseholdId);
-      // Set up auto-refresh every 30 seconds
+      // Set up auto-refresh every 10 minutes
       const interval = setInterval(() => {
         loadHouseholdData(selectedHouseholdId);
-      }, 30000);
+      }, 600000); // 10 minutes = 600000 milliseconds
 
       return () => clearInterval(interval);
+    }
+  }, [selectedHouseholdId]);
+
+  // Connect to WebSocket when household changes
+  useEffect(() => {
+    if (selectedHouseholdId) {
+      // Clear previous locations when switching households
+      setLiveLocations({});
+
+      // Connect to WebSocket for this household
+      websocketService.connect(selectedHouseholdId);
+
+      // Subscribe to events
+      const unsubscribe = websocketService.onEvent((event: any) => {
+        // Handle initial state message
+        if (event.type === 'initial_state' && event.residents) {
+          setLiveLocations(event.residents);
+        }
+        // Handle regular location updates
+        else if (event.resident && event.location) {
+          const residentName = String(event.resident);
+          setLiveLocations(prev => ({
+            ...prev,
+            [residentName]: event.location
+          }));
+        }
+      });
+
+      // Cleanup on unmount or household change
+      return () => {
+        unsubscribe();
+        websocketService.disconnect();
+      };
     }
   }, [selectedHouseholdId]);
 
@@ -114,6 +151,14 @@ function App() {
       case 'INACTIVE': return 'text-gray-600';
       default: return 'text-gray-600';
     }
+  };
+
+  const formatLocation = (location: string): string => {
+    // Format location string (capitalize, replace underscores with spaces)
+    if (!location || location === 'Unknown') return location;
+    return location
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
   };
 
   return (
@@ -221,64 +266,63 @@ function App() {
           )}
         </div>
 
-        {/* Member Details Panel */}
+        {/* Live Feed Panel */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-8">Member Details</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-8">Live Feed</h2>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-4">
             {selectedHousehold && selectedHousehold.residents.length > 0 ? (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Member</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Last Activity</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Health Score</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Location</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedHousehold.residents.map((resident, index) => {
-                    const initials = resident.name.split(' ').map(n => n[0]).join('');
-                    const colors = ['blue', 'purple', 'green'];
-                    const color = colors[index % colors.length];
+              <>
+                {/* Show current locations for each resident */}
+                {selectedHousehold.residents.map((resident) => {
+                  const residentKey = resident.name.toLowerCase().replace(' ', '');
+                  const currentLocation = liveLocations[residentKey] || liveLocations[resident.name.toLowerCase()] || 'Unknown';
 
-                    return (
-                      <tr key={resident.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-5">
-                          <div className="flex items-center">
-                            <div className={`h-10 w-10 bg-${color}-100 rounded-full flex items-center justify-center`}>
-                              <span className={`text-${color}-700 font-semibold`}>{initials}</span>
-                            </div>
-                            <div className="ml-3">
-                              <p className="text-sm font-medium text-gray-900">{resident.name}</p>
-                              <p className="text-xs text-gray-500">Age: {resident.age}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-5 text-center">
-                          <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                            Active
+                  return (
+                    <div key={resident.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-blue-700 font-semibold">
+                            {resident.name.split(' ').map(n => n[0]).join('')}
                           </span>
-                        </td>
-                        <td className="px-4 py-5 text-center text-sm text-gray-600">
-                          {index === 0 ? '2 mins ago' : index === 1 ? '15 mins ago' : '1 hour ago'}
-                        </td>
-                        <td className="px-4 py-5 text-center">
-                          <p className="text-sm font-medium text-gray-900">{88 - index * 3}/100</p>
-                          <p className="text-xs text-gray-500">Good</p>
-                        </td>
-                        <td className="px-4 py-5 text-center text-sm text-gray-600">
-                          {index === 0 ? 'Living Room' : index === 1 ? 'Kitchen' : 'Bedroom'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {resident.name} is in {formatLocation(currentLocation)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {currentLocation !== 'Unknown' ? 'Live' : 'Waiting for data...'}
+                          </p>
+                        </div>
+                      </div>
+                      {currentLocation !== 'Unknown' && (
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                          <span className="text-xs text-green-600">Active</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Connection status */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">
+                      WebSocket: {websocketService.isConnected() ?
+                        <span className="text-green-600">Connected</span> :
+                        <span className="text-red-600">Disconnected</span>
+                      }
+                    </span>
+                    <span className="text-gray-500">
+                      Household: {selectedHouseholdId}
+                    </span>
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                {selectedHouseholdId ? 'No residents found' : 'Select a household to view members'}
+                {selectedHouseholdId ? 'No residents found' : 'Select a household to view live feed'}
               </div>
             )}
           </div>
