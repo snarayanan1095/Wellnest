@@ -51,7 +51,9 @@ class WebSocketService {
 
     // Determine WebSocket URL based on environment
     let wsUrl: string;
-    if (window.location.port === '5173') {
+    // Check if running on Vite dev server (ports 3000-3010 range)
+    const devPort = parseInt(window.location.port);
+    if (devPort >= 3000 && devPort <= 3010) {
       // Development - connect directly to backend
       wsUrl = `ws://localhost:8000/api/ws/events/${householdId}`;
     } else {

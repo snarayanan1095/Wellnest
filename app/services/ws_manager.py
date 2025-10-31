@@ -16,25 +16,34 @@ class ConnectionManager:
 
     async def add_connection_with_state(self, websocket, household_id: str):
         """Add an already-accepted WebSocket connection and send initial state"""
+        print(f"📤 Starting add_connection_with_state for {household_id}")
+
         if household_id not in self.active_connections:
             self.active_connections[household_id] = []
         self.active_connections[household_id].append(websocket)
+        print(f"📝 Added connection to list for {household_id}, total: {len(self.active_connections[household_id])}")
 
         # Send initial state of all residents' locations for this household
         # Send empty dict if no cached locations yet
         residents_data = self.resident_locations.get(household_id, {})
+        print(f"🔍 Cache check for {household_id}: {residents_data}")
+
         initial_state = {
             "type": "initial_state",
             "residents": residents_data
         }
+
         try:
+            print(f"📨 Attempting to send initial state to {household_id}...")
             await websocket.send_json(initial_state)
             if residents_data:
                 print(f"✓ Sent initial state to household {household_id}: {residents_data}")
             else:
                 print(f"✓ Sent empty initial state to household {household_id} (no cached data yet)")
         except Exception as e:
-            print(f"❌ Failed to send initial state: {e}")
+            print(f"❌ Failed to send initial state for {household_id}: {e}")
+            import traceback
+            traceback.print_exc()
 
     def add_connection(self, websocket, household_id: str):
         """Add an already-accepted WebSocket connection"""

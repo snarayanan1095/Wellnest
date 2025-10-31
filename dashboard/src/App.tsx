@@ -266,11 +266,18 @@ function App() {
           )}
         </div>
 
-        {/* Live Feed Panel */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-8">Live Feed</h2>
+        {/* Live Activity Feed and Alert Center */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Live Activity Feed Panel */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Live Activity Feed</h2>
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Live
+              </span>
+            </div>
 
-          <div className="space-y-4">
+            <div className="space-y-4">
             {selectedHousehold && selectedHousehold.residents.length > 0 ? (
               <>
                 {/* Show current locations for each resident */}
@@ -325,6 +332,98 @@ function App() {
                 {selectedHouseholdId ? 'No residents found' : 'Select a household to view live feed'}
               </div>
             )}
+            </div>
+          </div>
+
+          {/* Alert Center Panel */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Alert Center</h2>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                3 Active
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {/* Mock alerts for now - will be replaced with real data */}
+              {/* Critical Alert */}
+              <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-red-800">
+                      Prolonged Inactivity Detected
+                    </p>
+                    <p className="mt-1 text-xs text-red-700">
+                      No motion detected in Bedroom 1 for 4 hours
+                    </p>
+                    <p className="mt-2 text-xs text-red-600">
+                      2 minutes ago • Grandma
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warning Alert */}
+              <div className="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded-r-lg">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-yellow-800">
+                      Unusual Pattern Detected
+                    </p>
+                    <p className="mt-1 text-xs text-yellow-700">
+                      Multiple bathroom visits in short period
+                    </p>
+                    <p className="mt-2 text-xs text-yellow-600">
+                      15 minutes ago • Grandpa
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Alert */}
+              <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-blue-800">
+                      Late Wake Up
+                    </p>
+                    <p className="mt-1 text-xs text-blue-700">
+                      First activity detected at 10:30 AM
+                    </p>
+                    <p className="mt-2 text-xs text-blue-600">
+                      1 hour ago • Grandmom
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* No alerts state (hidden when there are alerts) */}
+              {false && (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="mt-2 text-sm">No active alerts</p>
+                  <p className="text-xs text-gray-400 mt-1">All systems normal</p>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </div>

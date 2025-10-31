@@ -25,10 +25,17 @@ async def websocket_alerts(websocket: WebSocket, household_id: str):
 @router.websocket("/ws/events/{household_id}")
 async def websocket_events(websocket: WebSocket, household_id: str):
     """WebSocket endpoint for real-time event streaming per household"""
+    print(f"🔌 WebSocket connection request for household {household_id}")
+
     # Accept the WebSocket connection without Origin validation
     await websocket.accept()
+    print(f"✅ WebSocket accepted for household {household_id}")
+
+    # Add connection and send initial state
+    print(f"📨 Calling add_connection_with_state for {household_id}...")
     await manager.add_connection_with_state(websocket, household_id)
     print(f"✓ WebSocket events client connected for household {household_id}")
+
     try:
         while True:
             # Keep connection alive by receiving heartbeat/ping messages
