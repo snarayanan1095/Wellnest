@@ -11,6 +11,7 @@ from app.api import semantic_search
 from app.api import households
 from app.api import dashboard_endpoints
 from app.api import alerts
+from app.api import routine_comparison
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -29,6 +30,9 @@ api_router.include_router(dashboard_endpoints.router)
 
 # Include Alerts router
 api_router.include_router(alerts.router, tags=["alerts"])
+
+# Include Routine Comparison router
+api_router.include_router(routine_comparison.router, tags=["routines"])
 
 # Register event ingestion endpoint directly using endpoint= parameter
 api_router.add_api_route(

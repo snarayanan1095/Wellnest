@@ -9,6 +9,7 @@ import {
 } from './services/api';
 import { websocketService } from './services/websocket';
 import { AlertService, type Alert, type AlertCounts } from './services/alerts';
+import RoutineTimeline from './components/RoutineTimeline';
 
 function App() {
   // State for household selection
@@ -528,6 +529,11 @@ function App() {
 
           </div>
         </div>
+      </div>
+
+      {/* Routine Timeline Panel - Below Live Feed and Alert Center */}
+      <div className="mt-6">
+        <RoutineTimeline householdId={selectedHouseholdId} />
       </div>
     </div>
   );

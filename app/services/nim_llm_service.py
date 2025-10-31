@@ -43,11 +43,29 @@ class NIMLLMService:
             requests.HTTPError: If the API call fails
             KeyError: If NIM_API_KEY is not found in environment variables
         """
+        prompt = NIMLLMService.build_llama3_prompt(routine_dict)
+        return NIMLLMService.get_custom_summary(prompt, max_tokens=128)
+
+    @staticmethod
+    def get_custom_summary(prompt: str, max_tokens: int = 150, temperature: float = 0.7) -> str:
+        """
+        Call the Llama-3 API with a custom prompt.
+
+        Args:
+            prompt: Custom prompt for the LLM
+            max_tokens: Maximum tokens to generate
+            temperature: Temperature for generation (0-1)
+
+        Returns:
+            LLM-generated response string
+
+        Raises:
+            requests.HTTPError: If the API call fails
+            KeyError: If NIM_API_KEY is not found in environment variables
+        """
         api_key = os.getenv("NIM_API_KEY")
         if not api_key:
             raise KeyError("NIM_API_KEY not found in environment variables")
-
-        prompt = NIMLLMService.build_llama3_prompt(routine_dict)
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -58,12 +76,16 @@ class NIMLLMService:
             "model": "meta/llama-3.1-8b-instruct",
             "messages": [
                 {
+                    "role": "system",
+                    "content": "You are a healthcare assistant analyzing elderly care patterns. Be concise and focus on actionable insights."
+                },
+                {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "max_tokens": 128,
-            "temperature": 0.6,  # Tweak for more/less creativity
+            "max_tokens": max_tokens,
+            "temperature": temperature,
             "top_p": 1.0,
             "stream": False
         }
