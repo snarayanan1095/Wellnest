@@ -719,3 +719,34 @@ class QdrantClient:
             return "Significantly different - potential anomaly detected"
         else:
             return "Highly unusual - immediate attention recommended"
+
+    @classmethod
+    async def search_daily_routines(
+        cls,
+        query_vector: List[float],
+        household_id: str,
+        limit: int = 10,
+        score_threshold: float = 0.3,
+        collection_name: str = "routine_baselines"
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for similar daily routines using vector similarity
+
+        Args:
+            query_vector: Query embedding vector
+            household_id: Household ID to filter results
+            limit: Maximum number of results
+            score_threshold: Minimum similarity score
+            collection_name: Collection to search (default: routine_daily)
+
+        Returns:
+            List of matching routines with scores and payloads
+        """
+        # For now, use the existing search_by_household method
+        # In production, this would search the routine_daily collection
+        return await cls.search_by_household(
+            collection_name=collection_name,
+            household_id=household_id,
+            query_vector=query_vector,
+            limit=limit
+        )

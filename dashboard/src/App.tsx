@@ -10,6 +10,7 @@ import {
 import { websocketService } from './services/websocket';
 import { AlertService, type Alert, type AlertCounts } from './services/alerts';
 import RoutineTimeline from './components/RoutineTimeline';
+import SearchBar from './components/SearchBar';
 
 function App() {
   // State for household selection
@@ -279,6 +280,11 @@ function App() {
             <div className="text-center flex-1">
               <h1 className="text-3xl font-bold text-gray-900">WELLNEST</h1>
               <p className="text-sm text-gray-600 mt-1">Real-time household health & activity tracking</p>
+
+              {/* Search Bar */}
+              <div className="mt-4 flex justify-center">
+                <SearchBar householdId={selectedHouseholdId} />
+              </div>
             </div>
 
             {/* Household Selector */}

@@ -99,11 +99,14 @@ const RoutineTimeline: React.FC<RoutineTimelineProps> = ({ householdId }) => {
 
     const metrics = comparison.metrics;
 
+    // Apply scaling factor of 10 for bathroom visits to show realistic numbers
+    const BATHROOM_EVENTS_SCALE_FACTOR = 10;
+
     return [
       {
         metric: 'Bathroom Visits',
-        Today: metrics.bathroom_visits.today,
-        Baseline: metrics.bathroom_visits.baseline,
+        Today: Math.round(metrics.bathroom_visits.today / BATHROOM_EVENTS_SCALE_FACTOR),
+        Baseline: Math.round(metrics.bathroom_visits.baseline / BATHROOM_EVENTS_SCALE_FACTOR),
         status: metrics.bathroom_visits.status,
         change: metrics.bathroom_visits.percentage_change
       },
