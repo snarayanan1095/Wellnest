@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   SearchService,
   type SearchResponse,
-  type SearchResult
+  type SearchResult,
+  type AnalysisResult
 } from '../services/search';
 
 interface SearchBarProps {
@@ -16,6 +17,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ householdId }) => {
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [includeAnalysis, setIncludeAnalysis] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Close results when clicking outside
@@ -44,8 +46,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ householdId }) => {
     setShowResults(true);
 
     try {
-      // Single unified search call
-      const result = await SearchService.performSearch(query, householdId);
+      // Single unified search call with optional analysis
+      const result = await SearchService.performSearch(query, householdId, 10, includeAnalysis);
       setSearchResults(result);
     } catch (err) {
       setError('Failed to perform search. Please try again.');
@@ -109,6 +111,45 @@ const SearchBar: React.FC<SearchBarProps> = ({ householdId }) => {
     );
   };
 
+  // Helper component to render AI analysis
+  const AnalysisCard: React.FC<{ analysis: AnalysisResult }> = ({ analysis }) => {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="flex items-start mb-3">
+          <span className="text-blue-600 mr-2">🤖</span>
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-blue-900 mb-2">AI Analysis</h4>
+            <p className="text-sm text-gray-700 mb-3">{analysis.summary}</p>
+
+            {analysis.insights && analysis.insights.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-600 mb-1">Key Insights:</p>
+                <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
+                  {analysis.insights.map((insight, index) => (
+                    <li key={index}>{insight}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {analysis.recommendations && (
+              <div className="mt-3 p-2 bg-blue-100 rounded">
+                <p className="text-xs font-semibold text-blue-800 mb-1">Recommended Action:</p>
+                <p className="text-xs text-blue-700">{analysis.recommendations}</p>
+              </div>
+            )}
+
+            <div className="mt-2 flex items-center text-xs text-gray-500">
+              <span>Analyzed {analysis.analyzed_count} results</span>
+              <span className="mx-2">•</span>
+              <span>Confidence: {Math.round(analysis.confidence * 100)}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div ref={searchRef} className="relative w-full max-w-2xl">
       <form onSubmit={handleSearch} className="relative">
@@ -140,6 +181,20 @@ const SearchBar: React.FC<SearchBarProps> = ({ householdId }) => {
             )}
           </button>
         </div>
+
+        {/* AI Analysis Toggle */}
+        <div className="mt-2 flex items-center">
+          <input
+            type="checkbox"
+            id="include-analysis"
+            checked={includeAnalysis}
+            onChange={(e) => setIncludeAnalysis(e.target.checked)}
+            className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="include-analysis" className="text-sm text-gray-600">
+            Include AI Analysis (adds 2-3 seconds)
+          </label>
+        </div>
       </form>
 
       {/* Search Results Dropdown */}
@@ -165,6 +220,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ householdId }) => {
             {/* Display search results */}
             {searchResults && !searching && (
               <div>
+                {/* Display AI Analysis if available */}
+                {searchResults.analysis && (
+                  <AnalysisCard analysis={searchResults.analysis} />
+                )}
+
                 {searchResults.results.length > 0 ? (
                   <>
                     <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">

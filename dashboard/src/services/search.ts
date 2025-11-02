@@ -6,6 +6,7 @@ export interface SearchRequest {
   query: string;
   household_id: string;
   limit?: number;
+  include_analysis?: boolean;
 }
 
 export interface SearchResult {
@@ -22,13 +23,27 @@ export interface SearchResult {
   };
 }
 
+export interface AnalysisResult {
+  summary: string;
+  insights: string[];
+  recommendations?: string;
+  confidence: number;
+  analyzed_count: number;
+}
+
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
+  analysis?: AnalysisResult;
 }
 
 export const SearchService = {
-  async performSearch(query: string, householdId: string, limit: number = 10): Promise<SearchResponse> {
+  async performSearch(
+    query: string,
+    householdId: string,
+    limit: number = 10,
+    includeAnalysis: boolean = false
+  ): Promise<SearchResponse> {
     const response = await fetch(`${API_BASE_URL}/search`, {
       method: 'POST',
       headers: {
@@ -38,6 +53,7 @@ export const SearchService = {
         query,
         household_id: householdId,
         limit,
+        include_analysis: includeAnalysis,
       }),
     });
 
