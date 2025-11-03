@@ -154,11 +154,11 @@ async def get_weekly_trends(
         start_of_day = datetime.combine(target_date, datetime.min.time())
         end_of_day = datetime.combine(target_date, datetime.max.time())
 
+        # Count all alerts for this day (including inactivity, anomalies, etc.)
         anomaly_count = await MongoDB.count(
             "alerts",
             query={
                 "household_id": household_id,
-                "type": "anomaly",
                 "timestamp": {"$gte": start_of_day.isoformat(), "$lte": end_of_day.isoformat()}
             }
         )
@@ -166,19 +166,26 @@ async def get_weekly_trends(
         if routine:
             score = calculate_daily_score(routine)
             status = "normal" if score >= 80 else ("caution" if score >= 60 else "alert")
-            key_activities = routine.get("total_daily_events", 0)
-        else:
-            score = 0.0
-            status = "alert"
-            key_activities = 0
+            # Fix: Use correct field name 'total_events' instead of 'total_daily_events'
+            key_activities = routine.get("total_events", 0)
 
-        trends.append({
-            "date": date_str,
-            "score": score,
-            "status": status,
-            "key_activities": key_activities,
-            "anomalies": anomaly_count
-        })
+            trends.append({
+                "date": date_str,
+                "score": score,
+                "status": status,
+                "key_activities": key_activities,
+                "anomalies": anomaly_count
+            })
+        # Only include days with no data if they are in the past (completed days)
+        elif target_date < today:
+            trends.append({
+                "date": date_str,
+                "score": 0.0,
+                "status": "alert",
+                "key_activities": 0,
+                "anomalies": anomaly_count
+            })
+        # Skip future/incomplete days with no data
 
     return trends
 
@@ -280,14 +287,14 @@ def calculate_daily_score(routine_data: dict) -> float:
         score -= 5
 
     # Penalize for low activity
-    total_events = routine_data.get("total_daily_events", 0)
+    total_events = routine_data.get("total_events", 0)
     if total_events < 100:
         score -= 20
     elif total_events < 500:
         score -= 10
 
     # Bonus for consistent bathroom visits
-    bathroom_visits = routine_data.get("bathroom_visits", 0)
+    bathroom_visits = routine_data.get("total_bathroom_events", 0)
     if 3 <= bathroom_visits <= 15:
         score += 5
 

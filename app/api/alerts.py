@@ -27,7 +27,8 @@ async def get_household_alerts(
     limit: int = Query(default=20, description="Maximum number of alerts to return"),
     severity: Optional[str] = Query(default=None, description="Filter by severity (high, medium, low)"),
     acknowledged: Optional[bool] = Query(default=None, description="Filter by acknowledged status"),
-    hours: int = Query(default=24, description="Get alerts from last N hours")
+    hours: int = Query(default=24, description="Get alerts from last N hours"),
+    include_resolved: bool = Query(default=False, description="Include auto-resolved alerts")
 ):
     """Get alerts for a specific household"""
     try:
@@ -43,6 +44,13 @@ async def get_household_alerts(
             query["severity"] = severity
         if acknowledged is not None:
             query["acknowledged"] = acknowledged
+
+        # By default, exclude auto-resolved alerts unless specifically requested
+        if not include_resolved:
+            query["$or"] = [
+                {"auto_resolved": {"$exists": False}},
+                {"auto_resolved": False}
+            ]
 
         # Get alerts from MongoDB
         alerts = await MongoDB.read(
@@ -103,12 +111,16 @@ async def get_alert_count(
 ):
     """Get alert counts by severity for a household"""
     try:
-        # Build base query
+        # Build base query - exclude auto-resolved alerts from counts
         time_threshold = datetime.utcnow() - timedelta(hours=hours)
         base_query = {
             "household_id": household_id,
             "timestamp": {"$gte": time_threshold.isoformat()},
-            "acknowledged": False
+            "acknowledged": False,
+            "$or": [
+                {"auto_resolved": {"$exists": False}},
+                {"auto_resolved": False}
+            ]
         }
 
         # Count by severity (matching actual severity levels from anomaly detector)
@@ -150,6 +162,36 @@ def _get_alert_title(alert_type: str) -> str:
         "unusual_activity": "Unusual Activity Pattern",
         "fall_detected": "Potential Fall Detected",
         "wandering": "Potential Wandering",
-        "medication_missed": "Medication Schedule Missed"
+        "medication_missed": "Medication Schedule Missed",
+        "prolonged_inactivity": "Prolonged Inactivity",
+        "missed_kitchen_activity": "Missed Kitchen Activity",
+        "excessive_bathroom_visits": "Excessive Bathroom Visits",
+        "late_wake_up": "Late Wake Up"
     }
     return titles.get(alert_type, alert_type.replace("_", " ").title())
+
+@router.post("/alerts/{household_id}/resolve-inactivity")
+async def manually_resolve_inactivity_alerts(household_id: str):
+    """Manually trigger resolution of prolonged inactivity alerts for testing"""
+    try:
+        from app.services.anomaly_detector import detector
+        await detector.resolve_inactivity_alerts(household_id)
+
+        # Check how many alerts remain unresolved
+        remaining = await MongoDB.count(
+            "alerts",
+            {
+                "household_id": household_id,
+                "type": "prolonged_inactivity",
+                "acknowledged": False
+            }
+        )
+
+        return {
+            "message": "Inactivity alert resolution triggered",
+            "household_id": household_id,
+            "remaining_unresolved": remaining
+        }
+    except Exception as e:
+        print(f"Error in manual resolution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from app.db.mongo import MongoDB
 from app.services.nim_llm_service import NIMLLMService
+from app.api.dashboard_endpoints import calculate_daily_score
 
 router = APIRouter()
 
@@ -208,6 +209,20 @@ Provide a brief 2-3 sentence analysis focusing on:
 2. Any concerning patterns that caregivers should monitor
 Keep it concise and actionable."""
 
+        # Get today's routine data for score calculation
+        today = comparison["date"]
+        daily_routine_id = f"{household_id}_{today}"
+        today_routine = await MongoDB.read(
+            "daily_routines",
+            query={"_id": daily_routine_id},
+            limit=1
+        )
+
+        # Calculate score
+        score = 0.0
+        if today_routine and len(today_routine) > 0:
+            score = calculate_daily_score(today_routine[0])
+
         # Use the NIM LLM service
         try:
             raw_summary = NIMLLMService.get_custom_summary(prompt, max_tokens=150, temperature=0.7)
@@ -227,6 +242,7 @@ Keep it concise and actionable."""
             return {
                 "household_id": household_id,
                 "date": comparison["date"],
+                "score": score,
                 "summary": summary,
                 "deviations": deviations,
                 "comparison_data": comparison
@@ -234,7 +250,9 @@ Keep it concise and actionable."""
         except Exception as llm_error:
             print(f"Error calling NIM LLM service: {llm_error}")
             # Fallback to rule-based summary if LLM fails
-            return generate_fallback_summary(comparison)
+            fallback_result = generate_fallback_summary(comparison)
+            fallback_result["score"] = score
+            return fallback_result
 
     except Exception as e:
         print(f"Error generating summary: {e}")

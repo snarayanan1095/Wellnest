@@ -162,4 +162,23 @@ class ConnectionManager:
             del self.active_connections[household_id]
             print(f"🧹 Cleaned up empty connection list for household {household_id}")
 
+    async def send_alert_resolved(self, household_id: str, resolution_info: dict):
+        """
+        Send a notification that an alert has been auto-resolved
+
+        Args:
+            household_id: The household ID
+            resolution_info: Details about the resolved alert
+        """
+        message = {
+            "type": "alert_resolved",
+            "household_id": household_id,
+            "alert_type": resolution_info.get("type"),
+            "message": resolution_info.get("message"),
+            "resolved_count": resolution_info.get("resolved_count", 1),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        await self.send_alert(household_id, message)
+
 manager = ConnectionManager()

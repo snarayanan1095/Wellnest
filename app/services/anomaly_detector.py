@@ -65,6 +65,15 @@ class AnomalyDetector:
         # Mark household as active when we receive any event
         await self.update_household_status(household_id, "active")
 
+        # Auto-resolve prolonged inactivity alerts when motion is detected
+        if event["sensor_type"] == "motion":
+            print(f"🔍 Motion event detected: value='{event['value']}' (type: {type(event['value'])})")
+            if event["value"] in ["True", "true", True, "1", 1]:
+                print(f"✓ Motion is active, triggering alert resolution for {household_id}")
+                await self.resolve_inactivity_alerts(household_id)
+            else:
+                print(f"ℹ️ Motion value is {event['value']}, not triggering resolution")
+
         # Immediate anomaly detection only for critical events
         if event["sensor_type"] in self.CRITICAL_EVENTS:
             await self.check_anomalies(household_id, last_event=event, force=True)
@@ -315,5 +324,61 @@ class AnomalyDetector:
                 print(f"✓ Updated household {household_id} status to '{status}'")
         except Exception as e:
             print(f"✗ Failed to update household {household_id} status: {e}")
+
+    async def resolve_inactivity_alerts(self, household_id: str):
+        """
+        Auto-resolve prolonged inactivity alerts when activity is detected
+
+        Args:
+            household_id: The household ID
+        """
+        try:
+            # Find unacknowledged prolonged inactivity alerts for this household
+            query = {
+                "household_id": household_id,
+                "type": "prolonged_inactivity",
+                "acknowledged": False
+            }
+
+            # First check if there are any alerts to resolve
+            existing_alerts = await MongoDB.read("alerts", query=query, limit=10)
+            if not existing_alerts:
+                print(f"ℹ️ No unresolved prolonged inactivity alerts for {household_id}")
+                return
+
+            print(f"🔍 Found {len(existing_alerts)} unresolved prolonged inactivity alert(s) for {household_id}")
+
+            # Update all matching alerts to acknowledged
+            result = await MongoDB.update(
+                "alerts",
+                query=query,
+                update={
+                    "$set": {
+                        "acknowledged": True,
+                        "auto_resolved": True,
+                        "resolved_at": datetime.now(timezone.utc).isoformat(),
+                        "resolution_reason": "Activity detected - auto-resolved"
+                    }
+                }
+            )
+
+            if result > 0:
+                print(f"✅ Auto-resolved {result} prolonged inactivity alert(s) for {household_id}")
+
+                # Send notification to frontend about resolved alerts
+                try:
+                    await manager.send_alert_resolved(household_id, {
+                        "type": "prolonged_inactivity",
+                        "message": "Inactivity alert resolved - motion detected",
+                        "resolved_count": result
+                    })
+                except Exception as ws_error:
+                    print(f"⚠️ Failed to send WebSocket notification: {ws_error}")
+            else:
+                print(f"⚠️ No alerts were modified for {household_id} despite finding {len(existing_alerts)}")
+        except Exception as e:
+            print(f"⚠️ Error resolving inactivity alerts for {household_id}: {e}")
+            import traceback
+            traceback.print_exc()
 
 detector = AnomalyDetector()

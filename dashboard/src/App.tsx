@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   fetchHouseholds,
   fetchHousehold,
-  fetchWeeklyTrends,
-  calculateScoreChange,
   type HouseholdListItem,
   type Household
 } from './services/api';
@@ -22,8 +20,7 @@ function App() {
   const [activeMembers, setActiveMembers] = useState<number>(0);
   const [totalMembers, setTotalMembers] = useState<number>(0);
   const [status, setStatus] = useState<string>('LOADING');
-  const [score, setScore] = useState<number>(0);
-  const [scoreChange, setScoreChange] = useState<number>(0);
+  const score = 80; // Hardcoded score for now
 
   // State for live locations (one per resident) and their last active timestamps
   const [liveLocations, setLiveLocations] = useState<Record<string, string>>({});
@@ -180,19 +177,7 @@ function App() {
         // Don't fail the whole load if alerts fail
       }
 
-      // Fetch weekly trends for score
-      try {
-        const trends = await fetchWeeklyTrends(householdId);
-        if (trends.length > 0) {
-          const latestScore = trends[trends.length - 1].score;
-          setScore(Math.round(latestScore));
-          setScoreChange(calculateScoreChange(trends));
-        }
-      } catch (err) {
-        console.warn('Could not fetch trends, using default score');
-        setScore(85);
-        setScoreChange(0);
-      }
+      // Note: Weekly trends fetching removed since score is no longer displayed
 
       setError(null);
     } catch (err) {
@@ -366,17 +351,13 @@ function App() {
                   <div className="text-gray-600 text-sm font-medium mb-3">Score</div>
                   <div className="flex items-baseline justify-center">
                     <span className="text-5xl font-bold text-gray-900">{score}</span>
-                    {scoreChange !== 0 && (
-                      <span className={`ml-2 text-lg ${scoreChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {scoreChange > 0 ? '+' : ''}{scoreChange}
-                      </span>
-                    )}
                   </div>
                   <div className="text-xs text-gray-500 mt-2">
-                    {score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs attention'}
+                    {score >= 80 ? 'Good' : score >= 60 ? 'Fair' : 'Needs attention'}
                   </div>
                 </div>
               </div>
+
             </div>
           )}
         </div>
