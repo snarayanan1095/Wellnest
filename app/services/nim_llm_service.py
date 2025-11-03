@@ -73,7 +73,7 @@ class NIMLLMService:
         }
 
         data = {
-            "model": "meta/llama-3.1-8b-instruct",
+            "model": "nvidia/llama-3.1-nemotron-nano-8b-v1",
             "messages": [
                 {
                     "role": "system",
