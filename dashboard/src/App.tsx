@@ -393,15 +393,14 @@ function App() {
                           <p className="text-sm font-semibold text-gray-900">
                             {resident.name} is in {formatLocation(currentLocation)}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {currentLocation !== 'Unknown'
-                              ? formatLastActive(lastActiveTimestamps[resident.name]).detail
-                              : 'Waiting for data...'
-                            }
-                          </p>
+                          {currentLocation !== 'Unknown' && lastActiveTimestamps[resident.name] && (
+                            <p className="text-xs text-gray-500">
+                              {formatLastActive(lastActiveTimestamps[resident.name]).detail}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      {currentLocation !== 'Unknown' && (
+                      {currentLocation !== 'Unknown' && lastActiveTimestamps[resident.name] && (
                         <div className="flex items-center">
                           {formatLastActive(lastActiveTimestamps[resident.name]).status === 'Active now' ? (
                             <>
@@ -414,11 +413,6 @@ function App() {
                               <span className="text-xs text-yellow-600">
                                 {formatLastActive(lastActiveTimestamps[resident.name]).status}
                               </span>
-                            </>
-                          ) : formatLastActive(lastActiveTimestamps[resident.name]).status === 'Not active' ? (
-                            <>
-                              <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-400">Not active</span>
                             </>
                           ) : (
                             <>

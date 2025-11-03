@@ -10,7 +10,8 @@ from kafka.errors import KafkaError
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List] = {}
-        # Kafka is used as the source of truth for all events
+        # In-memory cache: {household_id: {resident: {"location": str, "timestamp": str}}}
+        self.location_cache: Dict[str, Dict[str, Dict[str, str]]] = {}
 
     async def connect(self, websocket, household_id: str):
         await websocket.accept()
@@ -93,8 +94,15 @@ class ConnectionManager:
             print(f"⚠️ Error fetching events from Kafka: {e}")
             import traceback
             traceback.print_exc()
-            # Fall back to empty state if Kafka query fails
-            pass
+
+        # If Kafka returned no data, fall back to in-memory cache
+        if not residents_data and household_id in self.location_cache:
+            print(f"💾 Kafka returned no data, using cache for {household_id}")
+            cache_data = self.location_cache[household_id]
+            for resident, data in cache_data.items():
+                residents_data[resident] = data.get("location")
+                timestamps[resident] = data.get("timestamp")
+            print(f"💾 Cache hit! Loaded {len(residents_data)} residents from cache")
 
         initial_state = {
             "type": "initial_state",
@@ -126,11 +134,20 @@ class ConnectionManager:
 
     async def update_resident_location(self, household_id: str, resident: str, location: str):
         """
-        No-op: Location updates are now handled directly via Kafka.
-        This method is kept for backward compatibility with events_consumer.py
+        Update the in-memory cache with resident's latest location
+        Called by events_consumer when forwarding Kafka events to WebSocket
         """
-        # Events are already in Kafka - no need to cache separately
-        pass
+        # Initialize household cache if it doesn't exist
+        if household_id not in self.location_cache:
+            self.location_cache[household_id] = {}
+
+        # Update or create resident's location entry
+        self.location_cache[household_id][resident] = {
+            "location": location,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        print(f"💾 Updated cache: {household_id}/{resident} -> {location}")
 
     def disconnect(self, websocket, household_id: str):
         if household_id in self.active_connections:
