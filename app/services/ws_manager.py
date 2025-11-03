@@ -3,12 +3,14 @@ from typing import Dict, List, Optional
 import json
 from datetime import datetime
 import asyncio
-from app.db.mongo import MongoDB
+import os
+from kafka import KafkaConsumer
+from kafka.errors import KafkaError
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List] = {}
-        # MongoDB will be used for persistent cache instead of in-memory
+        # Kafka is used as the source of truth for all events
 
     async def connect(self, websocket, household_id: str):
         await websocket.accept()
@@ -25,32 +27,73 @@ class ConnectionManager:
         self.active_connections[household_id].append(websocket)
         print(f"📝 Added connection to list for {household_id}, total: {len(self.active_connections[household_id])}")
 
-        # Fetch cached resident locations from MongoDB
+        # Fetch recent events directly from Kafka
         residents_data = {}
         timestamps = {}
 
         try:
-            # Get all resident locations for this household from MongoDB
-            locations = await MongoDB.read(
-                "resident_locations",
-                query={"household_id": household_id},
-                sort=[("last_active", -1)]  # Most recent first
+            # Read recent events from Kafka topic
+            bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+            topic = os.getenv("KAFKA_TOPIC_EVENTS", "wellnest-events")
+
+            print(f"🔌 Connecting to Kafka at {bootstrap_servers} to fetch recent events...")
+
+            # Create a consumer to read recent messages
+            consumer = KafkaConsumer(
+                topic,
+                bootstrap_servers=bootstrap_servers,
+                auto_offset_reset='earliest',  # Start from beginning to get recent history
+                enable_auto_commit=False,
+                group_id=f'initial-state-{household_id}',  # Unique group per household
+                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+                consumer_timeout_ms=2000  # 2 second timeout
             )
 
-            # Group by resident (in case of duplicates, use most recent)
-            seen_residents = set()
-            for loc in locations:
-                resident = loc.get("resident")
-                if resident and resident not in seen_residents:
-                    residents_data[resident] = loc.get("location", "Unknown")
-                    timestamps[resident] = loc.get("last_active")
-                    seen_residents.add(resident)
+            # Poll to trigger partition assignment
+            consumer.poll(timeout_ms=100)
 
-            print(f"🔍 MongoDB cache check for {household_id}: {len(residents_data)} residents")
+            # Check if partitions are assigned
+            if consumer.assignment():
+                # Seek to end first to get partition info
+                consumer.seek_to_end()
+
+                # Now seek backwards to get last N messages (e.g., last 100)
+                for partition in consumer.assignment():
+                    current_position = consumer.position(partition)
+                    # Go back 100 messages or to beginning
+                    new_position = max(0, current_position - 100)
+                    consumer.seek(partition, new_position)
+
+                # Consume and process messages
+                messages = consumer.poll(timeout_ms=2000)
+            else:
+                print(f"⚠️ No partitions assigned yet for topic {topic}")
+                messages = {}
+
+            for topic_partition, records in messages.items():
+                for record in records:
+                    event = record.value
+
+                    # Only process events for this household
+                    if event.get("household_id") == household_id:
+                        resident = event.get("resident")
+                        location = event.get("location")
+                        timestamp = event.get("timestamp") or event.get("last_active")
+
+                        if resident and location:
+                            # Always update with latest (newer messages come later)
+                            residents_data[resident] = location
+                            if timestamp:
+                                timestamps[resident] = timestamp
+
+            consumer.close()
+            print(f"🔍 Kafka fetch for {household_id}: {len(residents_data)} residents")
 
         except Exception as e:
-            print(f"⚠️ Error fetching cached locations from MongoDB: {e}")
-            # Fall back to empty state if MongoDB query fails
+            print(f"⚠️ Error fetching events from Kafka: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fall back to empty state if Kafka query fails
             pass
 
         initial_state = {
@@ -82,35 +125,12 @@ class ConnectionManager:
         self.active_connections[household_id].append(websocket)
 
     async def update_resident_location(self, household_id: str, resident: str, location: str):
-        """Update the cached location and timestamp for a resident in MongoDB"""
-        try:
-            timestamp = datetime.utcnow()
-
-            # Upsert the resident location document
-            document = {
-                "_id": f"{household_id}_{resident}",  # Unique ID per household-resident combo
-                "household_id": household_id,
-                "resident": resident,
-                "location": location,
-                "last_active": timestamp.isoformat(),
-                "updated_at": timestamp.isoformat()
-            }
-
-            # First try to update, if no document exists, insert it
-            result = await MongoDB.update(
-                "resident_locations",
-                {"_id": document["_id"]},
-                {"$set": document}
-            )
-
-            # If no document was modified, insert a new one
-            if result == 0:
-                await MongoDB.write("resident_locations", document)
-
-            print(f"📍 MongoDB cache updated: {household_id}/{resident} -> {location} at {timestamp.strftime('%H:%M:%S')}")
-
-        except Exception as e:
-            print(f"❌ Failed to update MongoDB cache: {e}")
+        """
+        No-op: Location updates are now handled directly via Kafka.
+        This method is kept for backward compatibility with events_consumer.py
+        """
+        # Events are already in Kafka - no need to cache separately
+        pass
 
     def disconnect(self, websocket, household_id: str):
         if household_id in self.active_connections:

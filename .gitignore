@@ -243,3 +243,4 @@ dashboard/.env.local
 dashboard/.env.*.local
 DASHBOARD_IMPLEMENTATION.md
 docker-compose.yml
+dashboard/.vite
