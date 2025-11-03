@@ -242,4 +242,4 @@ lerna-debug.log*
 dashboard/.env.local
 dashboard/.env.*.local
 DASHBOARD_IMPLEMENTATION.md
-sat
+docker-compose.yml
