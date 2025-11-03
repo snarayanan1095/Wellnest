@@ -8,7 +8,8 @@ Our AI software keeps families connected to aging loved ones by learning routine
 - Real-time Monitoring: Live location tracking and activity status
 - Intelligent Alerts: Three-tier alert system (High/Medium/Low priority)
 - Natural Language Insights: AI-generated summaries of daily activities
-- Semantic Search: Vector-based search for finding specific routine patterns
+- Semantic Search: Vector-based search for finding specific routine patterns.
+Try questions like: “Find days that were unusual” or “Show routines with late kitchen and high activity”
 - Trend Analysis: 7-day rolling baseline comparison
 
 ## 🚀 Quick Start Guide
