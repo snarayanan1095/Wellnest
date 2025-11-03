@@ -207,7 +207,7 @@ function App() {
   };
 
   const formatLastActive = (timestamp: string | undefined): { status: string; detail: string } => {
-    if (!timestamp) return { status: 'Unknown', detail: 'No data' };
+    if (!timestamp) return { status: 'Not active', detail: 'No data' };
 
     const date = new Date(timestamp);
     const now = new Date();
@@ -414,6 +414,11 @@ function App() {
                               <span className="text-xs text-yellow-600">
                                 {formatLastActive(lastActiveTimestamps[resident.name]).status}
                               </span>
+                            </>
+                          ) : formatLastActive(lastActiveTimestamps[resident.name]).status === 'Not active' ? (
+                            <>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                              <span className="text-xs text-gray-400">Not active</span>
                             </>
                           ) : (
                             <>
